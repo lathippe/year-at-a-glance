@@ -459,11 +459,9 @@ export function OrreryDial({
   /** Aspect lines are a layer, off until asked for: click the Sun for all of
       them, or a planet for its own. On first sight the dial should be the sky,
       not a web of chords. */
-  // On a personal chart the aspect layer waits for a click on the Sun, because
-  // the natal wheel underneath is already dense. The universal chart has nothing
-  // else to read, and the aspects are the whole point of it, so it opens with
-  // them showing.
-  const [aspectsVisible, setAspectsVisible] = useState(!personal);
+  // Off until asked for, on every chart. The dial should first read as the sky;
+  // the aspects are a second layer over it and the Sun is the switch.
+  const [aspectsVisible, setAspectsVisible] = useState(false);
   // Hoisted out of the layer below: the pointer handler needs the same list.
   // The sky at birth, computed once: it never changes, and it is the reference
   // the moving dial is read against.

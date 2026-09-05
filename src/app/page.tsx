@@ -1,4 +1,5 @@
 import { SelectedDateProvider } from "@/lib/selectedDate";
+import { StarField } from "@/components/StarField";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { YearAtAGlance } from "@/components/YearAtAGlance";
 import { skyRibbon } from "@/lib/skyRibbon";
@@ -17,6 +18,7 @@ export default function Home() {
 
   return (
     <SelectedDateProvider>
+    <StarField />
     <main className="min-h-screen w-full max-w-[1180px] mx-auto px-4 py-10 sm:py-14">
       <div className="flex justify-end mb-2">
         <ThemeToggle />
