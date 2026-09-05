@@ -390,3 +390,12 @@ body {
     animation-duration: 1ms;
   }
 }
+
+/* One screen. Nothing lives below the fold, so the page has nothing to scroll
+   to — and the wheel over the dial is a control, not a scroll gesture. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}

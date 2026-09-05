@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OrreryDial } from "./OrreryDial";
 import { helioPositions } from "@/lib/helio";
-import { useIsDark } from "@/lib/useIsDark";
 import { useSelectedDate } from "@/lib/selectedDate";
 
 const DAY = 86400000;
-const START = Date.UTC(2026, 0, 1);
-const END = Date.UTC(2027, 3, 30);
-const SPAN = END - START;
+const MONTH = 30.44 * DAY;
+/** Sixteen months on the ruler at a time, walked three at a step. */
+const SPAN = Math.round(16 * MONTH);
+const STEP = Math.round(3 * MONTH);
 
 function ink(v: number, night: boolean): string {
   if (v < 0) return night ? "#d24a3a" : "#b8392b";
@@ -25,7 +25,6 @@ function ink(v: number, night: boolean): string {
  * makes the dial's own wheel scrubbing move the ruler and the readout for free.
  */
 export function YearAtAGlance() {
-  const night = useIsDark();
   const { selected, setSelected } = useSelectedDate();
   const [drifting, setDrifting] = useState(true);
   const [dragging, setDragging] = useState(false);
@@ -34,6 +33,10 @@ export function YearAtAGlance() {
   // Counting days from a fixed base means the ticker never reads the date back,
   // so it does not restart itself on every day that passes.
   const [base] = useState(() => selected);
+  const [nowMs] = useState(() => Date.now());
+  // The ruler's window. It starts around today and can be walked either way, so
+  // the year on screen is never the only year there is.
+  const [start, setStart] = useState(() => selected.getTime() - SPAN * 0.35);
 
   useEffect(() => {
     if (!drifting) return;
@@ -65,7 +68,19 @@ export function YearAtAGlance() {
   }, [drifting, setSelected, base]);
 
   const planets = useMemo(() => helioPositions(selected), [selected]);
-  const t = Math.min(1, Math.max(0, (selected.getTime() - START) / SPAN));
+  const t = Math.min(1, Math.max(0, (selected.getTime() - start) / SPAN));
+  const shift = (dir: 1 | -1) => {
+    stop();
+    setStart((v) => v + dir * STEP);
+  };
+  const today = () => {
+    stop();
+    const now = nowMs;
+    setSelected(new Date(now));
+    // Recentre only when today has fallen off the ruler, so pressing it twice
+    // does not shuffle the window about.
+    if (now < start || now > start + SPAN) setStart(now - SPAN * 0.35);
+  };
   const stop = () => setDrifting(false);
 
   const moveTo = (clientX: number) => {
@@ -74,36 +89,34 @@ export function YearAtAGlance() {
     const r = el.getBoundingClientRect();
     if (!r.width) return;
     const k = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-    setSelected(new Date(START + k * SPAN));
+    setSelected(new Date(start + k * SPAN));
   };
 
   const months = useMemo(() => {
     const out: { ms: number; label: string; year: boolean }[] = [];
-    for (let m = 0; ; m++) {
-      const ms = Date.UTC(2026, m, 1);
-      if (ms > END) break;
+    const d = new Date(start);
+    const cur = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    while (cur.getTime() <= start + SPAN) {
       out.push({
-        ms,
-        label: new Date(ms).toLocaleDateString("en-GB", { month: "short" }),
-        year: m % 12 === 0,
+        ms: cur.getTime(),
+        label: cur.toLocaleDateString("en-GB", { month: "short" }),
+        year: cur.getUTCMonth() === 0,
       });
+      cur.setUTCMonth(cur.getUTCMonth() + 1);
     }
     return out;
-  }, []);
+  }, [start]);
 
   return (
     <div className="flex flex-col items-center">
       <div className="h-[100dvh] w-full flex flex-col items-center px-4 pt-5 pb-4">
-        <header className="flex flex-col items-center gap-1 shrink-0">
-          <h1 className="display" style={{ fontSize: 24, lineHeight: 1.1 }}>
-            Year at a Glance
-          </h1>
-          {/* The readout for the wheel: knowing where you have scrolled to is
-              the whole interaction, so it is the biggest thing here. */}
-          <span className="display" style={{ fontSize: 19, lineHeight: 1.25 }}>
+        <header className="flex flex-col items-center gap-0.5 shrink-0">
+          {/* The only text on the page. It is the readout for the wheel, and
+              knowing where you have scrolled to is the whole interaction. */}
+          <span className="display" style={{ fontSize: 21, lineHeight: 1.2 }}>
             {selected.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
           </span>
-          <span className="label">{drifting ? "scroll to take over" : "scroll the dial"}</span>
+          <span className="label">scroll the dial</span>
         </header>
 
         <div
@@ -119,10 +132,10 @@ export function YearAtAGlance() {
         {/* Just a ruler. The aspect bars that used to live here said the same
             thing the dial says, one scroll away, and took a third of the cover
             to say it. */}
-        <div className="w-full max-w-[54rem] shrink-0 select-none">
+        <div className="w-full max-w-[54rem] shrink-0 select-none flex flex-col items-center gap-1">
           <div
             ref={track}
-            className="relative h-9 cursor-ew-resize touch-none"
+            className="relative h-9 w-full cursor-ew-resize touch-none"
             onPointerDown={(e) => {
               stop();
               (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -138,7 +151,7 @@ export function YearAtAGlance() {
           >
             <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-[color:var(--border)]" />
             {months.map((m) => {
-              const p = ((m.ms - START) / SPAN) * 100;
+              const p = ((m.ms - start) / SPAN) * 100;
               return (
                 <div key={m.ms} className="absolute top-1/2" style={{ left: `${p}%` }}>
                   <div
@@ -171,41 +184,22 @@ export function YearAtAGlance() {
               }}
             />
           </div>
+          <div className="flex items-center gap-1.5">
+            {([["‹", -1], ["today", 0], ["›", 1]] as const).map(([label, dir]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => (dir === 0 ? today() : shift(dir as 1 | -1))}
+                aria-label={dir === 0 ? "Back to today" : dir < 0 ? "Earlier" : "Later"}
+                className="rounded-full border border-[color:var(--border)] hover:border-[color:var(--border-strong)] transition-colors text-[color:var(--muted-strong)] h-6 px-2.5 text-[11px] leading-none cursor-pointer"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <section className="w-full max-w-[62rem] px-6 pb-16 flex flex-col items-center gap-5 text-center">
-        <h2 className="label">What the dial does</h2>
-        <div className="grid gap-x-10 gap-y-4 sm:grid-cols-3 w-full">
-          {[
-            ["Angles true, distances not", "Rings are spaced for reading. Every angle is exact."],
-            ["An arc is an aspect", "Click the Sun to bring them in."],
-            ["The waist is the hardness", "A trine barely dips. An opposition comes apart."],
-          ].map(([t, d]) => (
-            <div key={t} className="flex flex-col items-center gap-1">
-              <span className="text-[13px] text-[color:var(--foreground)]">{t}</span>
-              <p className="text-[12px] leading-relaxed text-[color:var(--muted)] max-w-[30ch]">{d}</p>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center justify-center gap-5">
-          {([["Harmony", 1], ["Conjunction", 0], ["Tension", -1]] as const).map(([label, v]) => (
-            <span key={label} className="flex items-center gap-2 text-[11px] text-[color:var(--muted)]">
-              <svg width="34" height="8" aria-hidden>
-                <defs>
-                  <linearGradient id={`k${v}`} x1="0" x2="1">
-                    <stop offset="0%" stopColor={ink(v, night)} stopOpacity={1} />
-                    <stop offset="50%" stopColor={ink(v, night)} stopOpacity={v < 0 ? 0.1 : v > 0 ? 0.78 : 1} />
-                    <stop offset="100%" stopColor={ink(v, night)} stopOpacity={1} />
-                  </linearGradient>
-                </defs>
-                <path d="M1 6 Q17 1 33 6" fill="none" stroke={`url(#k${v})`} strokeWidth={1.4} />
-              </svg>
-              {label}
-            </span>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

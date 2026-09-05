@@ -408,6 +408,20 @@ const BELT = (() => {
   });
 })();
 
+/** The page is in English; the engine names things in Russian. One map here
+    rather than a second set of names threaded through the ephemeris. */
+const EN: Record<string, string> = {
+  "Солнце": "Sun", "Луна": "Moon", "Меркурий": "Mercury", "Венера": "Venus",
+  "Земля": "Earth", "Марс": "Mars", "Юпитер": "Jupiter", "Сатурн": "Saturn",
+  "Уран": "Uranus", "Нептун": "Neptune", "Плутон": "Pluto",
+  "соединение": "conjunction", "секстиль": "sextile", "квадрат": "square",
+  "тригон": "trine", "оппозиция": "opposition",
+};
+const en = (s: string) => EN[s] ?? s;
+
+const SIGNS_EN = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra",
+  "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+
 const SIGNS = ["Овен", "Телец", "Близнецы", "Рак", "Лев", "Дева", "Весы", "Скорпион", "Стрелец", "Козерог", "Водолей", "Рыбы"];
 
 /** Two skies. Night is the Solar Walk field: deep space, stars, bodies in the
@@ -1164,7 +1178,7 @@ export function OrreryDial({
               setAspectsVisible((v) => !v);
             }}
           >
-            <title>{aspectsVisible ? "Скрыть аспекты" : "Показать аспекты"}</title>
+            <title>{aspectsVisible ? "Hide aspects" : "Show aspects"}</title>
           </circle>
 
         {/* Where each planet stood at birth, as a small dot on its own orbit,
@@ -1643,16 +1657,6 @@ export function OrreryDial({
         const pa = pointAt(activeAspect.a.lon, radiusFor(activeAspect.a.au, night));
         const pb = pointAt(activeAspect.b.lon, radiusFor(activeAspect.b.au, night));
         const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
-        const reading = readSkyAspect(
-          activeAspect.a.name,
-          activeAspect.a.geoLon!,
-          activeAspect.b.name,
-          activeAspect.b.geoLon!,
-          activeAspect.name,
-          activeAspect.orb,
-          ASPECT_ORB,
-          selected
-        );
         return (
           <div
             className="absolute pointer-events-none rounded-md px-2.5 py-1.5"
@@ -1666,26 +1670,11 @@ export function OrreryDial({
             }}
           >
             <div className="text-sm font-medium" style={{ color: activeAspect.tone }}>
-              {activeAspect.a.glyph} {activeAspect.a.nameRu} {activeAspect.symbol}{" "}
-              {activeAspect.b.glyph} {activeAspect.b.nameRu}
+              {activeAspect.a.glyph} {en(activeAspect.a.nameRu)} {activeAspect.symbol}{" "}
+              {activeAspect.b.glyph} {en(activeAspect.b.nameRu)}
             </div>
-            {/* Same card as on the timeline, minus the line about the chosen
-                day: a sky aspect is by definition happening on it. */}
             <div className="text-[10px] text-[color:var(--muted)] tabular-nums mt-0.5">
-              орб {activeAspect.orb.toFixed(1)}° · дома {toRoman(reading.houses[0])} и{" "}
-              {toRoman(reading.houses[1])} · сила {reading.strength}
-            </div>
-            {reading.hook && (
-              <div className="text-[10px]" style={{ color: activeAspect.tone }}>
-                задевает натал: {reading.hook.transit.body.glyph}{" "}
-                {reading.hook.aspect.symbol} {reading.hook.natal.body.glyph}{" "}
-                {reading.hook.natal.body.nameRu}
-              </div>
-            )}
-            <div className="text-[11px] text-[color:var(--foreground)] mt-1 leading-snug">
-              <span style={{ color: activeAspect.tone }}>{reading.word}</span>
-              {reading.word && " · "}
-              {reading.brief}
+              {en(activeAspect.nameRu)} · orb {activeAspect.orb.toFixed(1)}°
             </div>
           </div>
         );
@@ -1719,15 +1708,15 @@ export function OrreryDial({
                 display: "inline-block",
               }}
             />
-            {active.glyph} {active.nameRu}
+            {active.glyph} {en(active.nameRu)}
           </div>
           <div className="text-[11px] tabular-nums" style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
-            {SIGNS[active.signIdx]} {Math.floor(active.degreeInSign)}° ·{" "}
+            {SIGNS_EN[active.signIdx]} {Math.floor(active.degreeInSign)}° ·{" "}
             {active.isMoon
-              ? `${Math.round((active.au * 149597870.7) / 1000)} тыс. км`
-              : `${active.au.toFixed(2)} а.е.`}{" "}
-            ·{" "}
-            {active.degPerDay < 0.1 ? active.degPerDay.toFixed(3) : active.degPerDay.toFixed(2)}°/сут
+              ? `${Math.round((active.au * 149597870.7) / 1000)}k km`
+              : `${active.au.toFixed(2)} AU`}{" "}
+            · {active.degPerDay < 0.1 ? active.degPerDay.toFixed(3) : active.degPerDay.toFixed(2)}
+            °/day
           </div>
           {(() => {
             const { inSky, toNatal } = aspectsOf(active, skyAspects);
@@ -1749,10 +1738,7 @@ export function OrreryDial({
                 </div>
               );
             return (
-              <div className="mt-1.5 grid grid-cols-2 gap-x-3">
-                {group("в небе", inSky)}
-                {group("к наталу", toNatal)}
-              </div>
+              <div className="mt-1.5">{group("aspects", inSky)}</div>
             );
           })()}
         </div>
