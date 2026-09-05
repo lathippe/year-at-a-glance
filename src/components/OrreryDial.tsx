@@ -556,7 +556,11 @@ export function OrreryDial({
     const STEP = 36; // wheel pixels per day
     const onWheel = (e: WheelEvent) => {
       const { hover: h, pinned: p, selected: day } = wheelState.current;
-      if (h || p) return;
+      // On a personal chart the wheel goes back to the page while something is
+      // being read, so a card can be scrolled past. The universal chart is a
+      // cover: scrolling it is the only way through the year, and handing the
+      // wheel back moves the whole screen out from under the reader instead.
+      if (personal && (h || p)) return;
       e.preventDefault();
       acc += e.deltaY;
       const days = Math.trunc(acc / STEP);
@@ -566,7 +570,7 @@ export function OrreryDial({
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [setSelected]);
+  }, [setSelected, personal]);
   // Hover reads, click keeps. Nothing on the dial is labelled, so the card is
   // the only name: it has to survive the pointer leaving.
   // Two different jobs. `shown` drives the lit state on the dial and survives a

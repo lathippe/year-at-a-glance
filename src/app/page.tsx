@@ -2,7 +2,6 @@ import { SelectedDateProvider } from "@/lib/selectedDate";
 import { StarField } from "@/components/StarField";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { YearAtAGlance } from "@/components/YearAtAGlance";
-import { skyRibbon } from "@/lib/skyRibbon";
 
 export const dynamic = "force-dynamic";
 
@@ -12,23 +11,20 @@ export const dynamic = "force-dynamic";
  * server because the ribbon walks the whole window through the ephemeris.
  */
 export default function Home() {
-  // Centre and span cover 1 Jan 2026 to 30 Apr 2027, the window the page draws.
-  const centre = new Date(Date.UTC(2026, 8, 1));
-  const bars = skyRibbon(centre, 245);
-
   return (
     <SelectedDateProvider>
     <StarField />
-    <main className="min-h-screen w-full max-w-[1180px] mx-auto px-4 py-10 sm:py-14">
-      <div className="flex justify-end mb-2">
+    <main className="relative w-full">
+      {/* Floating, not in the flow: the cover is exactly one screen tall and
+          anything above it would push the dial off the bottom. */}
+      <div className="absolute top-4 right-4 z-10">
         <ThemeToggle />
       </div>
-      <YearAtAGlance bars={bars} />
-      <footer className="mt-16 flex flex-col items-center gap-1 text-center">
+      <YearAtAGlance />
+      <footer className="pb-10 flex flex-col items-center gap-1 text-center">
         <span className="label">Heliocentric dial · geocentric aspects</span>
         <span className="text-[11px] text-[color:var(--muted)]">
-          Ephemerides computed locally with astronomy-engine. No accounts, no
-          tracking, no birth data.
+          Computed locally with astronomy-engine. No accounts, no tracking, no birth data.
         </span>
       </footer>
     </main>
