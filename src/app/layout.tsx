@@ -1,0 +1,59 @@
+import type { Metadata } from "next";
+import { Inter, Roboto_Mono, Literata } from "next/font/google";
+import "./globals.css";
+
+// The dashboard is written in Russian, so every family must ship Cyrillic and
+// must request the subset — Next only downloads the subsets listed here, and
+// without "cyrillic" the whole interface silently fell back to system fonts.
+// Midday's own sans is Hedvig Letters Sans, which has no Cyrillic. refero's
+// substitute is Inter with the letter-spacing overridden — the widened tracking
+// is the theme's signature, not the typeface.
+const sans = Inter({
+  variable: "--font-sans-family",
+  subsets: ["latin", "cyrillic"],
+});
+
+// Was IBM Plex Mono, whose zero is slashed. Roboto Mono draws a plain oval
+// zero, ships Cyrillic, and is variable, so the 400/500/600 the labels use come
+// from one file instead of three.
+const mono = Roboto_Mono({
+  variable: "--font-mono-family",
+  subsets: ["latin", "cyrillic"],
+});
+
+// Was Fraunces, which has no Cyrillic in any subset — the display serif never
+// actually rendered a Russian date. Literata covers Cyrillic and keeps the opsz
+// axis, so the optical-size behaviour Fraunces was picked for survives.
+const literata = Literata({
+  variable: "--font-literata",
+  subsets: ["latin", "cyrillic"],
+  axes: ["opsz"],
+});
+
+export const metadata: Metadata = {
+  title: "Year at a Glance",
+  description:
+    "A year of sky on one dial: real planetary angles and the aspects between them, January 2026 to spring 2027.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html
+      lang="ru"
+      className={`${sans.variable} ${mono.variable} ${literata.variable} h-full antialiased`}
+    >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className="min-h-full flex flex-col">{children}</body>
+    </html>
+  );
+}
