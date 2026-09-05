@@ -4,7 +4,7 @@ A year of sky on one dial. January 2026 to the spring of 2027: the planets keep
 their real angles, the aspects between them come and go, and the whole stretch
 plays through once when the page opens.
 
-**Live:** _(deploy link)_
+**Live:** https://year-at-a-glance-beta.vercel.app
 
 ## What it draws
 
