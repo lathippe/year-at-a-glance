@@ -6,7 +6,7 @@ import type { HelioPos } from "@/lib/helio";
 import { helioPositions } from "@/lib/helio";
 import { useIsDark } from "@/lib/useIsDark";
 import { useSelectedDate } from "@/lib/selectedDate";
-import { planetTone } from "@/lib/planetTones";
+import { mixHex, planetTone } from "@/lib/planetTones";
 import {
   aspectTone,
   ASPECT_TONE_COLOR,
@@ -90,14 +90,24 @@ function ringFade(r: number): number {
 
 function radiusFor(au: number, night = true): number {
   const k = anchorFraction(au, night ? NIGHT_ANCHORS : DAY_ANCHORS);
-  return R_INNER + Math.max(0, Math.min(1, k)) * (R_OUTER - R_INNER);
+  // Quantised for the same reason as pointAt: this radius is written straight
+  // into an r attribute, and the two engines' Math.pow can differ in the last bit.
+  const r = R_INNER + Math.max(0, Math.min(1, k)) * (R_OUTER - R_INNER);
+  return Math.round(r * 1000) / 1000;
 }
 
 /** 0° Aries at three o'clock, longitude running counterclockwise — the way a
     chart wheel turns, not the way SVG counts. */
 function pointAt(lonDeg: number, r: number) {
   const a = (lonDeg * Math.PI) / 180;
-  return { x: C + r * Math.cos(a), y: C - r * Math.sin(a) };
+  // Rounded, and not for tidiness. Math.sin and Math.cos are not required to be
+  // correctly rounded, and Node and Chrome disagree on the last bit of some
+  // results — so the server writes 292.2915736888562 into an SVG attribute and
+  // the browser computes ...85626, and React reports a hydration mismatch over a
+  // difference no screen can hold. Three decimals of a 700-unit viewBox is far
+  // below a pixel and puts both engines on the same number.
+  const q = (v: number) => Math.round(v * 1000) / 1000;
+  return { x: q(C + r * Math.cos(a)), y: q(C - r * Math.sin(a)) };
 }
 
 /** Solar Walk's tail: the stretch of orbit a planet has just come through,
@@ -120,7 +130,11 @@ const TRAIL_REF_SWEEP = 164; // Mercury over the window, the fastest thing here
     reaches and how heavily it is drawn, so speed reads twice. */
 function speedFactor(degPerDay: number): number {
   const swept = degPerDay * TRAIL_WINDOW_DAYS;
-  return Math.min(1, Math.max(0, swept / TRAIL_REF_SWEEP)) ** 0.4;
+  // Rounded like pointAt and radiusFor: this feeds a stroke width and a trail
+  // length straight into the markup, and ** 0.4 is another operation the two
+  // engines round differently in the last bit.
+  const k = Math.min(1, Math.max(0, swept / TRAIL_REF_SWEEP)) ** 0.4;
+  return Math.round(k * 1e6) / 1e6;
 }
 
 function trailDegrees(degPerDay: number, night: boolean): number {
@@ -452,6 +466,7 @@ export function OrreryDial({
   variant = "auto",
   aspectMode = "chord",
   personal = true,
+  wheelScrub = true,
 }: {
   planets: HelioPos[];
   /** The dial is drawn at 460 and scales down; inside a column it wants a cap. */
@@ -466,6 +481,9 @@ export function OrreryDial({
    * The public showcase runs this way and ships no birth data at all.
    */
   personal?: boolean;
+  /** Off when the page owns the wheel itself, so the gesture works beside the
+      dial as well as over it and nothing counts a scroll twice. */
+  wheelScrub?: boolean;
 }) {
   const isDark = useIsDark();
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -565,7 +583,7 @@ export function OrreryDial({
   }, [hover, pinned, selected]);
   useEffect(() => {
     const el = svgRef.current;
-    if (!el) return;
+    if (!el || !wheelScrub) return;
     let acc = 0;
     const STEP = 36; // wheel pixels per day
     const onWheel = (e: WheelEvent) => {
@@ -584,7 +602,7 @@ export function OrreryDial({
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [setSelected, personal]);
+  }, [setSelected, personal, wheelScrub]);
   // Hover reads, click keeps. Nothing on the dial is labelled, so the card is
   // the only name: it has to survive the pointer leaving.
   // Two different jobs. `shown` drives the lit state on the dial and survives a
@@ -807,6 +825,25 @@ export function OrreryDial({
             <stop offset="72%" stopColor="#ffffff" stopOpacity={0.55} />
             <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
           </radialGradient>
+          {/* One gradient per body, day only. The light sits up and to the
+              left on all of them, so ten dots read as ten balls lit by the same
+              sun instead of ten flat stickers. */}
+          {!night &&
+            planets.map((p) => (
+              <radialGradient
+                key={`sphere-${p.name}`}
+                id={`sphere-${p.name}-${uid}`}
+                cx="50%"
+                cy="50%"
+                r="66%"
+                fx="32%"
+                fy="26%"
+              >
+                <stop offset="0%" stopColor={mixHex(p.tone, "white", 0.72)} />
+                <stop offset="40%" stopColor={mixHex(p.tone, "white", 0.14)} />
+                <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.32)} />
+              </radialGradient>
+            ))}
           <mask id={`field-mask-${uid}`}>
             <circle cx={C} cy={C} r={SIZE / 2} fill={`url(#fade-${uid})`} />
           </mask>
@@ -1384,7 +1421,14 @@ export function OrreryDial({
                   /* Solid, in a lighter blue than Earth's ring. With Earth hollow
                      and the two set apart, no knockout or pinhole is needed to
                      tell them apart any more. */
-                  <circle cx={pt.x} cy={pt.y} r={2.3} fill={bodyInk(p, night)} />
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={2.4}
+                    fill={`url(#sphere-${p.name}-${uid})`}
+                    stroke={mixHex(p.tone, "black", 0.3)}
+                    strokeWidth={0.6}
+                  />
                 )
               ) : night ? (
                 <>
@@ -1438,24 +1482,25 @@ export function OrreryDial({
                     filter={`url(#${inLitHouse ? "lift" : "body"}-glow-${uid})`}
                     opacity={inLitHouse ? 0.7 : isHover ? 0.55 : 0.38}
                   />
+                  {/* A small sphere, not a ring around the paper. The rim is
+                      the body's own colour darkened rather than a second hue, so
+                      the edge stays crisp at four pixels without adding ink the
+                      reading has to account for. */}
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={p.isEarth ? 2.7 : 3.1}
-                    fill="var(--surface)"
+                    r={p.isEarth ? 3.2 : 3.7}
+                    fill={`url(#sphere-${p.name}-${uid})`}
+                    stroke={mixHex(p.tone, "black", 0.34)}
+                    strokeWidth={0.7}
+                    opacity={isHover ? 1 : 0.96}
                   />
-                  {/* The ring thickens inward, not outward: a stroke sits centred
-                      on its path, so the radius drops by half the width and the
-                      outer edge stays exactly where it was. The body keeps its
-                      footprint on the dial and only the hole gets smaller. */}
                   <circle
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={(p.isEarth ? 3.2 : 3.7) - RING_WIDTH / 2}
-                    fill="none"
-                    stroke={bodyInk(p, night)}
-                    strokeWidth={RING_WIDTH}
-                    opacity={isHover ? 1 : 0.92}
+                    cx={pt.x - (p.isEarth ? 1 : 1.15)}
+                    cy={pt.y - (p.isEarth ? 1.1 : 1.25)}
+                    r={p.isEarth ? 0.8 : 0.9}
+                    fill="#ffffff"
+                    opacity={isHover ? 0.8 : 0.55}
                   />
                 </>
               )}

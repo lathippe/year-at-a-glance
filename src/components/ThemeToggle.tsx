@@ -42,7 +42,11 @@ export function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label="Switch between the day and night charts"
-      title={theme === "dark" ? "Switch to the day chart" : "Switch to the night chart"}
+      // Names neither palette. The server cannot know which one the browser will
+      // stamp on, so a title that says "switch to day" is a hydration mismatch on
+      // half the loads — and a tooltip that reads as a verb answers the same
+      // question anyway.
+      title="Switch between the night and day chart"
       className="flex items-center gap-2 rounded-full border border-[color:var(--border)] hover:border-[color:var(--border-strong)] transition-colors text-[color:var(--muted-strong)] px-3 h-8 cursor-pointer"
     >
       <span style={{ fontSize: 14 }} aria-hidden>

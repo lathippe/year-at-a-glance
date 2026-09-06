@@ -39,3 +39,19 @@ export function inkOn(hex: string): string {
   const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luma > 0.62 ? "#2c2411" : "#ffffff";
 }
+
+/**
+ * A body's colour pushed toward white or black. The day dial paints planets as
+ * little spheres, and a sphere needs a lit side and a shaded one out of the one
+ * hue it is allowed — mixing in sRGB is close enough at four pixels across.
+ */
+export function mixHex(hex: string, toward: "white" | "black", k: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const end = toward === "white" ? 255 : 0;
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) =>
+    Math.round(c + (end - c) * k)
+  );
+  return `#${ch.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+}

@@ -43,7 +43,10 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="ru"
+      // The inline script below stamps data-theme before React arrives, so the
+      // root element is meant to differ from what the server sent.
+      suppressHydrationWarning
+      lang="en"
       className={`${sans.variable} ${mono.variable} ${literata.variable} h-full antialiased`}
     >
       <head>
