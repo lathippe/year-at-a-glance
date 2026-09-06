@@ -6,7 +6,7 @@ import type { HelioPos } from "@/lib/helio";
 import { helioPositions } from "@/lib/helio";
 import { useIsDark } from "@/lib/useIsDark";
 import { useSelectedDate } from "@/lib/selectedDate";
-import { mixHex, planetTone } from "@/lib/planetTones";
+import { mixHex, planetTone, rimFor } from "@/lib/planetTones";
 import {
   aspectTone,
   ASPECT_TONE_COLOR,
@@ -126,8 +126,9 @@ const TRAIL_SPAN_DEG = 66;
 const TRAIL_DAY_STRETCH = 1.25;
 const TRAIL_REF_SWEEP = 164; // Mercury over the window, the fastest thing here
 
-/** 0 for the slowest body here, 1 for the fastest. Drives both how far the tail
-    reaches and how heavily it is drawn, so speed reads twice. */
+/** 0 for the slowest body here, 1 for the fastest. It sets how far the tail
+    reaches, and only that: it used to set the stroke width as well, which made
+    speed read twice and the second reading said importance instead. */
 function speedFactor(degPerDay: number): number {
   const swept = degPerDay * TRAIL_WINDOW_DAYS;
   // Rounded like pointAt and radiusFor: this feeds a stroke width and a trail
@@ -211,6 +212,8 @@ const MOON_OFFSET = 8.2;
 /** Thickness of a planet's outline on the paper sky. Grown inward from a fixed
     outer edge, so a heavier ring never makes the body take more room. */
 const RING_WIDTH = 2;
+/** One grey for every daytime trail. */
+const TRAIL_DAY = "#8d8780";
 
 /** Where a body sits on the dial. The Moon has no solar orbit worth drawing, so
     it is pinned beside Earth in its true geocentric direction: the distance is a
@@ -1353,7 +1356,6 @@ export function OrreryDial({
             : (signHolds && p.signIdx !== signHover) ||
               (houseHolds && !inHouse(p)) ||
               (natalHits.length > 0 && !touchesNatal);
-          const speed = speedFactor(p.degPerDay);
           const deg = trailDegrees(p.degPerDay, night);
           const tailStart = pointAt(p.lon - deg, r);
           const gid = `trail-grad-${uid}-${gi}`;
@@ -1372,9 +1374,14 @@ export function OrreryDial({
                   x2={pt.x}
                   y2={pt.y}
                 >
-                  <stop offset="0%" stopColor={p.tone} stopOpacity={0} />
-                  <stop offset="55%" stopColor={p.tone} stopOpacity={isHover ? (night ? 0.55 : 0.6) : night ? 0.3 : 0.38} />
-                  <stop offset="100%" stopColor={p.tone} stopOpacity={isHover ? 1 : night ? 0.85 : 0.9} />
+                  {/* Grey on paper, the body's own tint at night. Once the day
+                      planets wear their real colours, a matching trail puts a
+                      second pale cream stroke on white paper and Venus loses its
+                      path altogether. Grey also stops the trail competing for the
+                      identity the disc now carries on its own. */}
+                  <stop offset="0%" stopColor={night ? p.tone : TRAIL_DAY} stopOpacity={0} />
+                  <stop offset="55%" stopColor={night ? p.tone : TRAIL_DAY} stopOpacity={isHover ? (night ? 0.55 : 0.55) : night ? 0.3 : 0.32} />
+                  <stop offset="100%" stopColor={night ? p.tone : TRAIL_DAY} stopOpacity={isHover ? 1 : night ? 0.85 : 0.75} />
                 </linearGradient>
               </defs>
               {!p.isMoon && (
@@ -1382,7 +1389,11 @@ export function OrreryDial({
                 d={trailPath(p.lon, r, deg)}
                 fill="none"
                 stroke={`url(#${gid})`}
-                strokeWidth={0.9 + speed * 1.3}
+                // One width for every body. Thickness was reading as importance —
+                // Mercury's trail was twice Neptune's — when the thing it stood
+                // for was speed, which the length already says, and says better:
+                // a long tail is a fast planet whichever way you look at it.
+                strokeWidth={1.15}
                 strokeLinecap="round"
               />
               )}
@@ -1426,7 +1437,7 @@ export function OrreryDial({
                     cy={pt.y}
                     r={2.4}
                     fill={`url(#sphere-${p.name}-${uid})`}
-                    stroke={mixHex(p.tone, "black", 0.3)}
+                    stroke={rimFor(p.tone)}
                     strokeWidth={0.6}
                   />
                 )
@@ -1491,10 +1502,27 @@ export function OrreryDial({
                     cy={pt.y}
                     r={p.isEarth ? 3.2 : 3.7}
                     fill={`url(#sphere-${p.name}-${uid})`}
-                    stroke={mixHex(p.tone, "black", 0.34)}
+                    stroke={rimFor(p.tone)}
                     strokeWidth={0.7}
                     opacity={isHover ? 1 : 0.96}
                   />
+                  {/* The one planet whose shape is recognisable at four pixels.
+                      Drawn across the disc rather than behind it: that is how a
+                      model of Saturn is read at this size, and hiding half of it
+                      for accuracy would only cost the recognition. */}
+                  {p.name === "Saturn" && (
+                    <ellipse
+                      cx={pt.x}
+                      cy={pt.y}
+                      rx={6.4}
+                      ry={1.6}
+                      transform={`rotate(-16 ${pt.x} ${pt.y})`}
+                      fill="none"
+                      stroke={rimFor(p.tone)}
+                      strokeWidth={0.75}
+                      opacity={isHover ? 0.95 : 0.8}
+                    />
+                  )}
                   <circle
                     cx={pt.x - (p.isEarth ? 1 : 1.15)}
                     cy={pt.y - (p.isEarth ? 1.1 : 1.25)}
