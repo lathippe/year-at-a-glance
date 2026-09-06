@@ -793,14 +793,21 @@ export function OrreryDial({
               /* Five stops instead of three: on white a three-stop falloff shows
                  its middle stop as a ring. */
               <>
-                <stop offset="0%" stopColor="#ffe9b8" stopOpacity={0.34} />
-                <stop offset="22%" stopColor="#ffdf9a" stopOpacity={0.26} />
-                <stop offset="45%" stopColor="#ffd07a" stopOpacity={0.16} />
-                <stop offset="70%" stopColor="#ffc061" stopOpacity={0.07} />
+                <stop offset="0%" stopColor="#ffe9b8" stopOpacity={0.46} />
+                <stop offset="22%" stopColor="#ffdf9a" stopOpacity={0.35} />
+                <stop offset="45%" stopColor="#ffcd72" stopOpacity={0.22} />
+                <stop offset="70%" stopColor="#ffbc57" stopOpacity={0.1} />
                 <stop offset="100%" stopColor="#f9b04a" stopOpacity={0} />
               </>
             )}
           </radialGradient>
+          {!night && (
+            <radialGradient id={`sun-inner-${uid}`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fff0c2" stopOpacity={0.6} />
+              <stop offset="40%" stopColor="#ffd071" stopOpacity={0.34} />
+              <stop offset="100%" stopColor="#ffb63f" stopOpacity={0} />
+            </radialGradient>
+          )}
           <filter id={`body-glow-${uid}`} x="-300%" y="-300%" width="700%" height="700%">
             <feGaussianBlur stdDeviation="2.4" />
           </filter>
@@ -828,9 +835,14 @@ export function OrreryDial({
             <stop offset="72%" stopColor="#ffffff" stopOpacity={0.55} />
             <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
           </radialGradient>
-          {/* One gradient per body, day only. The light sits up and to the
-              left on all of them, so ten dots read as ten balls lit by the same
-              sun instead of ten flat stickers. */}
+          {/* Day bodies are shaded in three passes, because one gradient makes a
+              disc with a bright corner and not a ball. First the light: offset up
+              and to the left, running down to a dark terminator. Then the limb:
+              transparent through the middle and dark right at the edge, all the
+              way round, which is the part the eye reads as curvature. Last a soft
+              specular, an ellipse rather than a dot so it sits on the surface
+              instead of being stuck to it. Twelve pixels across on this dial is
+              plenty of room for all three. */}
           {!night &&
             planets.map((p) => (
               <radialGradient
@@ -838,15 +850,62 @@ export function OrreryDial({
                 id={`sphere-${p.name}-${uid}`}
                 cx="50%"
                 cy="50%"
-                r="66%"
-                fx="32%"
-                fy="26%"
+                r="74%"
+                fx="30%"
+                fy="24%"
               >
-                <stop offset="0%" stopColor={mixHex(p.tone, "white", 0.72)} />
-                <stop offset="40%" stopColor={mixHex(p.tone, "white", 0.14)} />
-                <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.32)} />
+                <stop offset="0%" stopColor={mixHex(p.tone, "white", 0.8)} />
+                <stop offset="22%" stopColor={mixHex(p.tone, "white", 0.34)} />
+                <stop offset="52%" stopColor={p.tone} />
+                <stop offset="82%" stopColor={mixHex(p.tone, "black", 0.28)} />
+                <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.5)} />
               </radialGradient>
             ))}
+          {!night &&
+            planets.map((p) => (
+              <radialGradient
+                key={`limb-${p.name}`}
+                id={`limb-${p.name}-${uid}`}
+                cx="50%"
+                cy="50%"
+                r="50%"
+              >
+                <stop offset="62%" stopColor={mixHex(p.tone, "black", 0.62)} stopOpacity={0} />
+                <stop offset="88%" stopColor={mixHex(p.tone, "black", 0.62)} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.62)} stopOpacity={0.62} />
+              </radialGradient>
+            ))}
+          {/* Bands, for the two bodies that have them to show. At this size they
+              do not resolve as stripes so much as give the disc a grain, which is
+              what tells a gas giant from a painted marble. */}
+          {!night &&
+            planets
+              .filter((p) => p.name === "Jupiter" || p.name === "Saturn")
+              .map((p) => (
+                <linearGradient
+                  key={`bands-${p.name}`}
+                  id={`bands-${p.name}-${uid}`}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor={mixHex(p.tone, "black", 0.22)} />
+                  <stop offset="18%" stopColor={mixHex(p.tone, "white", 0.3)} />
+                  <stop offset="34%" stopColor={mixHex(p.tone, "black", 0.24)} />
+                  <stop offset="52%" stopColor={mixHex(p.tone, "white", 0.34)} />
+                  <stop offset="68%" stopColor={mixHex(p.tone, "black", 0.2)} />
+                  <stop offset="84%" stopColor={mixHex(p.tone, "white", 0.22)} />
+                  <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.26)} />
+                </linearGradient>
+              ))}
+          {!night && (
+            <radialGradient id={`spec-${uid}`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.9} />
+              <stop offset="55%" stopColor="#ffffff" stopOpacity={0.45} />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+            </radialGradient>
+          )}
           <mask id={`field-mask-${uid}`}>
             <circle cx={C} cy={C} r={SIZE / 2} fill={`url(#fade-${uid})`} />
           </mask>
@@ -1187,13 +1246,39 @@ export function OrreryDial({
             );
           })()}
 
+        {/* On paper the corona breathes: eleven seconds out and back, a few
+            percent of size and a little opacity. Slow enough that you catch it
+            only if you rest on it, which is the difference between a star and a
+            loading spinner. The night sky is left alone — it has the stars
+            twinkling already, and two things pulsing is a fairground. */}
         <circle
           cx={C}
           cy={C}
           r={night ? 34 : 26}
           fill={`url(#sun-corona-${uid})`}
           filter={night ? undefined : `url(#sun-haze-${uid})`}
+          style={
+            night
+              ? undefined
+              : ({ transformOrigin: `${C}px ${C}px`, animation: "sun-breathe 11s ease-in-out infinite" } as CSSProperties)
+          }
         />
+        {/* A second, tighter glow on a different period. One pulsing circle reads
+            as a mechanism; two that drift in and out of step read as something
+            burning, because the peaks never land in the same place twice. */}
+        {!night && (
+          <circle
+            cx={C}
+            cy={C}
+            r={11}
+            fill={`url(#sun-inner-${uid})`}
+            filter={`url(#sun-haze-${uid})`}
+            style={{
+              transformOrigin: `${C}px ${C}px`,
+              animation: "sun-pulse 7s ease-in-out infinite",
+            }}
+          />
+        )}
         <circle
           cx={C}
           cy={C}
@@ -1432,14 +1517,18 @@ export function OrreryDial({
                   /* Solid, in a lighter blue than Earth's ring. With Earth hollow
                      and the two set apart, no knockout or pinhole is needed to
                      tell them apart any more. */
-                  <circle
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={2.4}
-                    fill={`url(#sphere-${p.name}-${uid})`}
-                    stroke={rimFor(p.tone)}
-                    strokeWidth={0.6}
-                  />
+                  <>
+                    <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#sphere-${p.name}-${uid})`} />
+                    <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#limb-${p.name}-${uid})`} />
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={2.4}
+                      fill="none"
+                      stroke={rimFor(p.tone)}
+                      strokeWidth={0.6}
+                    />
+                  </>
                 )
               ) : night ? (
                 <>
@@ -1493,18 +1582,40 @@ export function OrreryDial({
                     filter={`url(#${inLitHouse ? "lift" : "body"}-glow-${uid})`}
                     opacity={inLitHouse ? 0.7 : isHover ? 0.55 : 0.38}
                   />
-                  {/* A small sphere, not a ring around the paper. The rim is
-                      the body's own colour darkened rather than a second hue, so
-                      the edge stays crisp at four pixels without adding ink the
-                      reading has to account for. */}
+                  {/* A shaded sphere, not a ring around the paper. Lit, then
+                      banded if it has bands, then darkened at the limb, then a
+                      specular, then a rim in the body's own colour darkened
+                      rather than a second hue. */}
                   <circle
                     cx={pt.x}
                     cy={pt.y}
                     r={p.isEarth ? 3.2 : 3.7}
                     fill={`url(#sphere-${p.name}-${uid})`}
+                    opacity={isHover ? 1 : 0.97}
+                  />
+                  {(p.name === "Jupiter" || p.name === "Saturn") && (
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={3.7}
+                      fill={`url(#bands-${p.name}-${uid})`}
+                      opacity={0.45}
+                    />
+                  )}
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={p.isEarth ? 3.2 : 3.7}
+                    fill={`url(#limb-${p.name}-${uid})`}
+                  />
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={p.isEarth ? 3.2 : 3.7}
+                    fill="none"
                     stroke={rimFor(p.tone)}
                     strokeWidth={0.7}
-                    opacity={isHover ? 1 : 0.96}
+                    opacity={isHover ? 1 : 0.95}
                   />
                   {/* The one planet whose shape is recognisable at four pixels.
                       Drawn across the disc rather than behind it: that is how a
@@ -1523,12 +1634,14 @@ export function OrreryDial({
                       opacity={isHover ? 0.95 : 0.8}
                     />
                   )}
-                  <circle
-                    cx={pt.x - (p.isEarth ? 1 : 1.15)}
-                    cy={pt.y - (p.isEarth ? 1.1 : 1.25)}
-                    r={p.isEarth ? 0.8 : 0.9}
-                    fill="#ffffff"
-                    opacity={isHover ? 0.8 : 0.55}
+                  <ellipse
+                    cx={pt.x - (p.isEarth ? 0.95 : 1.1)}
+                    cy={pt.y - (p.isEarth ? 1.05 : 1.2)}
+                    rx={p.isEarth ? 1.05 : 1.2}
+                    ry={p.isEarth ? 0.72 : 0.82}
+                    transform={`rotate(-32 ${pt.x - (p.isEarth ? 0.95 : 1.1)} ${pt.y - (p.isEarth ? 1.05 : 1.2)})`}
+                    fill={`url(#spec-${uid})`}
+                    opacity={isHover ? 0.9 : 0.7}
                   />
                 </>
               )}

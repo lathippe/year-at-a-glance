@@ -16,7 +16,7 @@ export const PLANET_TONE: Record<string, { day: string; night: string }> = {
   // 1.7:1 has almost no contrast against paper. The rim is what answers the last
   // one — see rimFor — and orbit radius answers the first two.
   Mercury: { day: "#7b736b", night: "#a8a29e" },
-  Venus: { day: "#ddc493", night: "#cab16a" },
+  Venus: { day: "#d0af6c", night: "#cab16a" },
   Earth: { day: "#3b7fbe", night: "#6fa8dc" },
   Mars: { day: "#b0472b", night: "#d98e74" },
   Jupiter: { day: "#c07a38", night: "#c8a26d" },

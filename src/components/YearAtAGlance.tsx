@@ -7,9 +7,8 @@ import { useSelectedDate } from "@/lib/selectedDate";
 
 const DAY = 86400000;
 const MONTH = 30.44 * DAY;
-/** Sixteen months on the ruler at a time, walked three at a step. */
+/** Sixteen months of ruler at a time. */
 const SPAN = Math.round(16 * MONTH);
-const STEP = Math.round(3 * MONTH);
 /** How far back the sky is drawn when the page opens, and how long it takes to
     catch up. Three weeks is enough for the Moon to swing right round and for
     Mercury to cross a sign — a glance at how today was arrived at, not a tour. */
@@ -71,9 +70,9 @@ export function YearAtAGlance() {
   // dragged along behind it. That is an exponential chase — always heading for
   // wherever the day now is, no fixed destination to be interrupted.
   //
-  // Opening the page and pressing today are single decisions with a known start
-  // and end, and they deserve to be watched. Those get a timed pass with an ease
-  // at both ends, so the planets leave at rest and arrive at rest.
+  // Opening the page, stepping a month and pressing today are single decisions
+  // with a known start and end, and they deserve to be watched. Those get a
+  // timed pass at a flat rate.
   const run = useCallback(() => {
     if (loop.current != null) return;
     last.current = performance.now();
@@ -83,9 +82,10 @@ export function YearAtAGlance() {
       const was = drawnRef.current;
       const tw = tween.current;
       if (tw) {
+        // No easing. The planets move at one rate from start to finish and stop
+        // where they arrive, which is how an orrery is cranked.
         const k = Math.min(1, (now - tw.t0) / tw.dur);
-        const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
-        drawnRef.current = tw.from + (tw.to - tw.from) * e;
+        drawnRef.current = tw.from + (tw.to - tw.from) * k;
         if (k >= 1) {
           drawnRef.current = tw.to;
           tween.current = null;
@@ -162,8 +162,15 @@ export function YearAtAGlance() {
   const planets = useMemo(() => helioPositions(drawn), [drawn]);
 
   const t = Math.min(1, Math.max(0, (drawnMs - start) / SPAN));
-  const shift = (dir: 1 | -1) => {
-    setStart((v) => v + dir * STEP);
+  /** One month either way. The arrows sit next to the date now, and a pair of
+      arrows around a date can only mean the date: they used to pan the ruler's
+      window instead, which was invisible from where they were about to stand.
+      The window follows the date on its own anyway. */
+  const stepMonth = (dir: 1 | -1) => {
+    const d = drawnRef.current === targetRef.current ? new Date(drawnRef.current) : selected;
+    const to = new Date(d.getFullYear(), d.getMonth() + dir, d.getDate());
+    setSelected(to);
+    glide(drawnRef.current, new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime(), 520);
   };
   const today = () => {
     const from = drawnRef.current;
@@ -212,12 +219,13 @@ export function YearAtAGlance() {
     return () => el.removeEventListener("wheel", onWheel);
   }, [setSelected]);
 
-  // The hint starts as the invitation and turns into the way back, but only once
-  // the invitation has plainly been taken: enough days travelled that scrubbing
-  // is understood, and enough time that the change is not a flicker.
-  const [hint, setHint] = useState<"scroll" | "reset">("scroll");
+  // The hint is the invitation while you are on today and the way back once you
+  // are not. Ten days is the threshold rather than nothing at all: a nudge of
+  // the wheel should not snatch away the instruction that got you to try it.
+  const away = Math.abs(drawnMs - todayMs) >= 10 * DAY;
+
   // A phone has neither a wheel nor an R key. The ruler is draggable on both, so
-  // on touch that is the instruction, and the way back is the button.
+  // on touch that is the instruction, and there are no shortcuts to print.
   const touch = useSyncExternalStore(
     (cb) => {
       const mq = window.matchMedia("(hover: none)");
@@ -227,13 +235,6 @@ export function YearAtAGlance() {
     () => window.matchMedia("(hover: none)").matches,
     () => false
   );
-  const travelled = useRef(0);
-  const prev = useRef(selected.getTime());
-  useEffect(() => {
-    travelled.current += Math.abs(selected.getTime() - prev.current) / DAY;
-    prev.current = selected.getTime();
-    if (travelled.current >= 40 && Date.now() - nowMs > 7000) setHint("reset");
-  }, [selected, nowMs]);
 
   const act = useRef(today);
   useEffect(() => {
@@ -299,21 +300,40 @@ export function YearAtAGlance() {
         ref={root}
         className="h-[100dvh] w-full flex flex-col items-center px-4 pt-5 pb-4 overscroll-none"
       >
-        <header className="flex flex-col items-center gap-0.5 shrink-0">
+        <header className="flex flex-col items-center gap-1 shrink-0">
           {/* The only text on the page. It is the readout for the wheel, and
-              knowing where you have scrolled to is the whole interaction. */}
-          <span className="display" style={{ fontSize: "clamp(17px, 4.4vw, 21px)", lineHeight: 1.2 }}>
-            {drawn.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-          </span>
-          <span className="label">
-            {hint === "scroll"
-              ? touch
-                ? "drag the ruler"
-                : "scroll the dial"
-              : touch
-                ? "tap today to come back"
-                : "press R or T to reset to today"}
-          </span>
+              knowing where you have scrolled to is the whole interaction. The
+              arrows are here rather than under the ruler because this is the
+              thing they move. */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button type="button" onClick={() => stepMonth(-1)} aria-label="A month earlier" className="step">
+              ‹
+            </button>
+            <span className="display" style={{ fontSize: "clamp(17px, 4.4vw, 21px)", lineHeight: 1.2 }}>
+              {drawn.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+            </span>
+            <button type="button" onClick={() => stepMonth(1)} aria-label="A month later" className="step">
+              ›
+            </button>
+          </div>
+          {!away ? (
+            <span className="label">{touch ? "drag the ruler" : "scroll the dial"}</span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <button type="button" onClick={today} className="label reset-link">
+                Reset to today
+              </button>
+              {/* Written the way a menu writes its shortcuts, because that is
+                  what these are. Nothing to show a phone, which has no keys. */}
+              {!touch && (
+                <span className="flex items-center gap-1">
+                  <kbd className="key">r</kbd>
+                  <span className="label" style={{ letterSpacing: 0 }}>or</span>
+                  <kbd className="key">t</kbd>
+                </span>
+              )}
+            </span>
+          )}
         </header>
 
         {/* Size containment turns the leftover height into a unit the square can
@@ -395,19 +415,6 @@ export function YearAtAGlance() {
                 transition: "width 120ms, height 120ms",
               }}
             />
-          </div>
-          <div className="flex items-center gap-1.5">
-            {([["‹", -1], ["today", 0], ["›", 1]] as const).map(([label, dir]) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => (dir === 0 ? today() : shift(dir as 1 | -1))}
-                aria-label={dir === 0 ? "Back to today" : dir < 0 ? "Earlier" : "Later"}
-                className="rounded-full border border-[color:var(--border)] hover:border-[color:var(--border-strong)] transition-colors text-[color:var(--muted-strong)] h-6 px-2.5 text-[11px] leading-none cursor-pointer"
-              >
-                {label}
-              </button>
-            ))}
           </div>
         </div>
       </div>

@@ -399,3 +399,57 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
 }
+
+/* The daytime sun. A star is never quite still, and the page has one light
+   source: giving it a slow swell is what stops the disc reading as a printed
+   dot. Kept under five percent so it is felt rather than watched. */
+@keyframes sun-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50%      { transform: scale(1.07); opacity: 1; }
+}
+@keyframes sun-pulse {
+  0%, 100% { transform: scale(1.06); opacity: 0.95; }
+  50%      { transform: scale(0.94); opacity: 0.65; }
+}
+
+/* The two arrows beside the date. No box: a border here would make them look
+   like the buttons that used to sit under the ruler, and they are a step, not a
+   destination. The tap target is padding rather than size, so they stay small
+   next to the date and are still fingerable on a phone. */
+.step {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 19px;
+  line-height: 1;
+  padding: 6px 8px;
+  margin: -6px -4px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 120ms;
+}
+.step:hover {
+  color: var(--muted-strong);
+}
+
+/* The way back, written as a link because that is what it does. */
+.reset-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color 120ms;
+}
+.reset-link:hover {
+  color: var(--muted-strong);
+}
+
+/* A key cap, the way a menu prints its shortcuts. Lowercase on purpose: it is
+   the key you press, not a word. */
+.key {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  color: var(--muted);
+}
