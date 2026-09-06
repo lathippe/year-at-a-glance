@@ -2,10 +2,11 @@
 
 /* theme: manual toggle via data-theme on <html>, system fallback */
 :root {
-  /* Midday "editorial broadsheet on parchment" (refero). The canvas is DARKER
-     than the cards — depth comes from surface contrast, not shadow, so panels
-     separate on their own and dense data stays readable. */
-  --background: #dbdad7; /* parchment */
+  /* Midday's parchment canvas is darker than the cards on purpose: depth comes
+     from surface contrast, so panels separate without shadow. This page has no
+     panels. The canvas IS the paper here, and at #dbdad7 it read as a grey wash
+     behind the dial rather than as a sheet the dial is drawn on. */
+  --background: #f4f3f0; /* paper */
   --surface: #ffffff;    /* paper */
   --surface-sunk: #e6e4e0; /* sand — inset rows, nested panels */
   --foreground: #121212; /* ink */

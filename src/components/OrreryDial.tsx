@@ -442,6 +442,15 @@ const en = (s: string) => EN[s] ?? s;
 const SIGNS_EN = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra",
   "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
 
+/** A body's colour as an actual value. `p.tone` is a CSS variable — good for a
+    fill, useless for arithmetic: mixHex and blendHex hand back anything that is
+    not a hex, so a gradient built from p.tone comes out as the same flat colour
+    at every stop, which is exactly what happened. Anything that computes a
+    colour goes through here first. */
+function toneHex(name: string, night: boolean): string {
+  return planetTone(name, night);
+}
+
 const ROLE_EN: Record<string, string> = {
   Sun: "vitality",
   Moon: "emotion",
@@ -764,6 +773,7 @@ export function OrreryDial({
           setHover(hit);
           if (hit && !hit.startsWith("asp:") && !hit.startsWith("natal:"))
             setAspectsVisible(true);
+          else if (!hit) setAspectsVisible(false);
           setPinned((s) => (hit ? (s === hit ? null : hit) : null));
         }}
         onPointerLeave={() => setHover(null)}
@@ -773,9 +783,14 @@ export function OrreryDial({
           // click through would undo the pin it just set.
           if ((e.nativeEvent as PointerEvent).pointerType !== "mouse" && touchMode) return;
           // Clicking a body shows its aspects, even if the layer was switched off
-          // at the Sun a moment ago.
+          // at the Sun a moment ago. Clicking nothing puts the layer away: the
+          // bodies are four pixels wide, so a miss is the common way to be done
+          // with a reading, and it used to leave every thread on screen with
+          // nothing selected. The Sun stops propagation, so its own switch is
+          // not caught by this.
           if (hover && !hover.startsWith("asp:") && !hover.startsWith("natal:"))
             setAspectsVisible(true);
+          else if (!hover) setAspectsVisible(false);
           setPinned((s) => (hover ? (s === hover ? null : hover) : null));
         }}
       >
@@ -862,7 +877,9 @@ export function OrreryDial({
               At twelve pixels every one of these is about two pixels of work, and
               all four are needed for any of it to read. */}
           {!night &&
-            planets.map((p) => (
+            planets.map((p) => {
+              const hex = toneHex(p.name, night);
+              return (
               <radialGradient
                 key={`sphere-${p.name}`}
                 id={`sphere-${p.name}-${uid}`}
@@ -872,34 +889,47 @@ export function OrreryDial({
                 fx="32%"
                 fy="26%"
               >
-                <stop offset="0%" stopColor={mixHex(p.tone, "white", 0.56)} />
-                <stop offset="30%" stopColor={mixHex(p.tone, "white", 0.16)} />
-                <stop offset="62%" stopColor={p.tone} />
-                <stop offset="88%" stopColor={mixHex(p.tone, "black", 0.34)} />
-                <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.54)} />
+                <stop offset="0%" stopColor={mixHex(hex, "white", 0.68)} />
+                <stop offset="26%" stopColor={mixHex(hex, "white", 0.2)} />
+                <stop offset="58%" stopColor={hex} />
+                <stop offset="84%" stopColor={mixHex(hex, "black", 0.42)} />
+                <stop offset="100%" stopColor={mixHex(hex, "black", 0.66)} />
               </radialGradient>
-            ))}
+              );
+            })}
           {!night &&
-            planets.map((p) => (
+            planets.map((p) => {
+              const hex = toneHex(p.name, night);
+              return (
               <radialGradient
                 key={`limb-${p.name}`}
                 id={`limb-${p.name}-${uid}`}
+                /* 78%, and the number is not a taste call. These gradients are
+                   struck from the light rather than the centre, so the far edge
+                   of the disc sits at |offset| + r_circle = 0.272 + 0.5 = 0.772
+                   of the box. Any radius above that and the last stops fall
+                   outside the shape and never paint — which is exactly what the
+                   first version of this bounce did. */
                 cx="34%"
                 cy="28%"
-                r="100%"
+                r="78%"
               >
-                <stop offset="84%" stopColor={mixHex(p.tone, "white", 0.62)} stopOpacity={0} />
-                <stop offset="95%" stopColor={mixHex(p.tone, "white", 0.62)} stopOpacity={0.32} />
-                <stop offset="100%" stopColor={mixHex(p.tone, "white", 0.7)} stopOpacity={0.5} />
+                <stop offset="58%" stopColor={mixHex(hex, "black", 0.72)} stopOpacity={0} />
+                <stop offset="80%" stopColor={mixHex(hex, "black", 0.72)} stopOpacity={0.3} />
+                <stop offset="92%" stopColor={mixHex(hex, "black", 0.72)} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={mixHex(hex, "black", 0.72)} stopOpacity={0.34} />
               </radialGradient>
-            ))}
+              );
+            })}
           {/* Bands, for the two bodies that have them to show. At this size they
               do not resolve as stripes so much as give the disc a grain, which is
               what tells a gas giant from a painted marble. */}
           {!night &&
             planets
               .filter((p) => p.name === "Jupiter" || p.name === "Saturn")
-              .map((p) => (
+              .map((p) => {
+                const hex = toneHex(p.name, night);
+                return (
                 <linearGradient
                   key={`bands-${p.name}`}
                   id={`bands-${p.name}-${uid}`}
@@ -908,19 +938,37 @@ export function OrreryDial({
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="0%" stopColor={mixHex(p.tone, "black", 0.22)} />
-                  <stop offset="18%" stopColor={mixHex(p.tone, "white", 0.3)} />
-                  <stop offset="34%" stopColor={mixHex(p.tone, "black", 0.24)} />
-                  <stop offset="52%" stopColor={mixHex(p.tone, "white", 0.34)} />
-                  <stop offset="68%" stopColor={mixHex(p.tone, "black", 0.2)} />
-                  <stop offset="84%" stopColor={mixHex(p.tone, "white", 0.22)} />
-                  <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.26)} />
+                  <stop offset="0%" stopColor={mixHex(hex, "black", 0.22)} />
+                  <stop offset="18%" stopColor={mixHex(hex, "white", 0.3)} />
+                  <stop offset="34%" stopColor={mixHex(hex, "black", 0.24)} />
+                  <stop offset="52%" stopColor={mixHex(hex, "white", 0.34)} />
+                  <stop offset="68%" stopColor={mixHex(hex, "black", 0.2)} />
+                  <stop offset="84%" stopColor={mixHex(hex, "white", 0.22)} />
+                  <stop offset="100%" stopColor={mixHex(hex, "black", 0.26)} />
                 </linearGradient>
-              ))}
+                );
+              })}
+          {!night &&
+            planets.map((p) => {
+              const hex = toneHex(p.name, night);
+              return (
+              <radialGradient
+                key={`bounce-${p.name}`}
+                id={`bounce-${p.name}-${uid}`}
+                cx="34%"
+                cy="28%"
+                r="78%"
+              >
+                <stop offset="90%" stopColor={mixHex(hex, "white", 0.78)} stopOpacity={0} />
+                <stop offset="97%" stopColor={mixHex(hex, "white", 0.78)} stopOpacity={0.6} />
+                <stop offset="100%" stopColor={mixHex(hex, "white", 0.9)} stopOpacity={0.92} />
+              </radialGradient>
+              );
+            })}
           {!night && (
             <radialGradient id={`spec-${uid}`} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.5} />
-              <stop offset="45%" stopColor="#ffffff" stopOpacity={0.28} />
+              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.92} />
+              <stop offset="38%" stopColor="#ffffff" stopOpacity={0.5} />
               <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
             </radialGradient>
           )}
@@ -1483,9 +1531,9 @@ export function OrreryDial({
                       cuts the path loose from the planet it belongs to. A third
                       is enough to tell whose trail it is without the trail
                       competing for the identity the disc already carries. */}
-                  <stop offset="0%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, p.tone, 0.34)} stopOpacity={0} />
-                  <stop offset="55%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, p.tone, 0.34)} stopOpacity={isHover ? (night ? 0.55 : 0.58) : night ? 0.3 : 0.36} />
-                  <stop offset="100%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, p.tone, 0.34)} stopOpacity={isHover ? 1 : night ? 0.85 : 0.8} />
+                  <stop offset="0%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, toneHex(p.name, night), 0.34)} stopOpacity={0} />
+                  <stop offset="55%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, toneHex(p.name, night), 0.34)} stopOpacity={isHover ? (night ? 0.55 : 0.58) : night ? 0.3 : 0.36} />
+                  <stop offset="100%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, toneHex(p.name, night), 0.34)} stopOpacity={isHover ? 1 : night ? 0.85 : 0.8} />
                 </linearGradient>
               </defs>
               {!p.isMoon && (
@@ -1539,6 +1587,7 @@ export function OrreryDial({
                   <>
                     <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#sphere-${p.name}-${uid})`} />
                     <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#limb-${p.name}-${uid})`} />
+                    <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#bounce-${p.name}-${uid})`} />
                     <ellipse
                       cx={pt.x - 0.62}
                       cy={pt.y - 0.75}
@@ -1625,12 +1674,18 @@ export function OrreryDial({
                     r={p.isEarth ? 3.2 : 3.7}
                     fill={`url(#limb-${p.name}-${uid})`}
                   />
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={p.isEarth ? 3.2 : 3.7}
+                    fill={`url(#bounce-${p.name}-${uid})`}
+                  />
                   <ellipse
                     cx={pt.x - (p.isEarth ? 0.85 : 1)}
                     cy={pt.y - (p.isEarth ? 1 : 1.15)}
-                    rx={p.isEarth ? 1.5 : 1.72}
-                    ry={p.isEarth ? 1 : 1.16}
-                    transform={`rotate(-34 ${pt.x - (p.isEarth ? 0.85 : 1)} ${pt.y - (p.isEarth ? 1 : 1.15)})`}
+                    rx={p.isEarth ? 1.15 : 1.32}
+                    ry={p.isEarth ? 0.92 : 1.06}
+                    transform={`rotate(-30 ${pt.x - (p.isEarth ? 0.85 : 1)} ${pt.y - (p.isEarth ? 1 : 1.15)})`}
                     fill={`url(#spec-${uid})`}
                   />
                   {/* The one planet whose shape is recognisable at four pixels.
@@ -1645,7 +1700,7 @@ export function OrreryDial({
                       ry={1.6}
                       transform={`rotate(-16 ${pt.x} ${pt.y})`}
                       fill="none"
-                      stroke={rimFor(p.tone)}
+                      stroke={rimFor(toneHex(p.name, night))}
                       strokeWidth={0.75}
                       opacity={isHover ? 0.95 : 0.8}
                     />
