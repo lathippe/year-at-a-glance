@@ -81,3 +81,19 @@ export function rimFor(hex: string): string {
   const luma = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
   return mixHex(hex, "black", 0.26 + luma * 0.3);
 }
+
+/** A step between two colours. Mixed in sRGB, which is close enough for two
+    tones this near each other. */
+export function blendHex(a: string, b: string, k: number): string {
+  const pa = /^#([0-9a-f]{6})$/i.exec(a.trim());
+  const pb = /^#([0-9a-f]{6})$/i.exec(b.trim());
+  if (!pa || !pb) return a;
+  const na = parseInt(pa[1], 16);
+  const nb = parseInt(pb[1], 16);
+  const ch = [16, 8, 0].map((sh) => {
+    const ca = (na >> sh) & 255;
+    const cb = (nb >> sh) & 255;
+    return Math.round(ca + (cb - ca) * k);
+  });
+  return `#${ch.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+}

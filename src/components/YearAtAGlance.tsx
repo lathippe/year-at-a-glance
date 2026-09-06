@@ -205,11 +205,24 @@ export function YearAtAGlance() {
     const el = root.current;
     if (!el) return;
     let acc = 0;
+    let lastT = 0;
+    let rate = 0;
     const PX_PER_DAY = 36;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       takeOver();
-      acc += e.deltaY;
+      // How hard the wheel is being turned, in pixels a millisecond, smoothed
+      // over about a tenth of a second so one violent event cannot throw it. A
+      // hurried scroll then covers more ground per turn than a careful one, the
+      // way a map zooms further when you mean it: a year is 4000 pixels of wheel
+      // at the flat rate, and nobody wants to sit through that to reach next
+      // spring. The floor is the flat rate, so a slow scroll still steps days.
+      const now = e.timeStamp || performance.now();
+      const dt = lastT ? Math.min(240, Math.max(6, now - lastT)) : 60;
+      lastT = now;
+      rate += (Math.abs(e.deltaY) / dt - rate) * (1 - Math.exp(-dt / 50));
+      const gain = Math.min(5, Math.max(1, rate / 0.9));
+      acc += e.deltaY * gain;
       const days = Math.trunc(acc / PX_PER_DAY);
       if (!days) return;
       acc -= days * PX_PER_DAY;
@@ -327,9 +340,9 @@ export function YearAtAGlance() {
                   what these are. Nothing to show a phone, which has no keys. */}
               {!touch && (
                 <span className="flex items-center gap-1">
-                  <kbd className="key">r</kbd>
-                  <span className="label" style={{ letterSpacing: 0 }}>or</span>
-                  <kbd className="key">t</kbd>
+                  <kbd className="key">R</kbd>
+                  <span className="joiner">or</span>
+                  <kbd className="key">T</kbd>
                 </span>
               )}
             </span>

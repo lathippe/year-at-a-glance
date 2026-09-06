@@ -442,11 +442,19 @@ body {
   color: var(--muted-strong);
 }
 
-/* A key cap, the way a menu prints its shortcuts. Lowercase on purpose: it is
-   the key you press, not a word. */
+/* A key cap, the way a menu prints its shortcuts. The letter is what carries,
+   so it is set in caps and the word between them is dropped to a whisper. */
+.joiner {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--muted);
+  opacity: 0.75;
+}
 .key {
   font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
   padding: 3px 5px;
   border: 1px solid var(--border-strong);

@@ -6,7 +6,7 @@ import type { HelioPos } from "@/lib/helio";
 import { helioPositions } from "@/lib/helio";
 import { useIsDark } from "@/lib/useIsDark";
 import { useSelectedDate } from "@/lib/selectedDate";
-import { mixHex, planetTone, rimFor } from "@/lib/planetTones";
+import { blendHex, mixHex, planetTone, rimFor } from "@/lib/planetTones";
 import {
   aspectTone,
   ASPECT_TONE_COLOR,
@@ -18,9 +18,7 @@ import {
   houseOfLongitude,
   toRoman,
   HOUSE_MEANING_RU,
-  BODY_ROLE_RU,
   ZODIAC_GLYPHS,
-  ZODIAC_SIGNS_RU,
 } from "@/lib/astrology";
 
 const SIZE = 460;
@@ -212,7 +210,8 @@ const MOON_OFFSET = 8.2;
 /** Thickness of a planet's outline on the paper sky. Grown inward from a fixed
     outer edge, so a heavier ring never makes the body take more room. */
 const RING_WIDTH = 2;
-/** One grey for every daytime trail. */
+/** The grey every daytime trail starts from, before a third of the body's
+    own colour is mixed in. */
 const TRAIL_DAY = "#8d8780";
 
 /** Where a body sits on the dial. The Moon has no solar orbit worth drawing, so
@@ -434,10 +433,27 @@ const EN: Record<string, string> = {
   "соединение": "conjunction", "секстиль": "sextile", "квадрат": "square",
   "тригон": "trine", "оппозиция": "opposition",
 };
+/** The engine names everything in Russian, so every string on its way to the
+    screen goes through here. Renaming the ephemeris for the sake of one English
+    page would be the tail wagging the dog; leaving a single call out is how
+    "Меркурий" ends up under an English heading. */
 const en = (s: string) => EN[s] ?? s;
 
 const SIGNS_EN = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra",
   "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+
+const ROLE_EN: Record<string, string> = {
+  Sun: "vitality",
+  Moon: "emotion",
+  Mercury: "thought",
+  Venus: "love and values",
+  Mars: "action",
+  Jupiter: "growth",
+  Saturn: "structure",
+  Uranus: "change",
+  Neptune: "intuition",
+  Pluto: "transformation",
+};
 
 const SIGNS = ["Овен", "Телец", "Близнецы", "Рак", "Лев", "Дева", "Весы", "Скорпион", "Стрелец", "Козерог", "Водолей", "Рыбы"];
 
@@ -835,14 +851,16 @@ export function OrreryDial({
             <stop offset="72%" stopColor="#ffffff" stopOpacity={0.55} />
             <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
           </radialGradient>
-          {/* Day bodies are shaded in three passes, because one gradient makes a
-              disc with a bright corner and not a ball. First the light: offset up
-              and to the left, running down to a dark terminator. Then the limb:
-              transparent through the middle and dark right at the edge, all the
-              way round, which is the part the eye reads as curvature. Last a soft
-              specular, an ellipse rather than a dot so it sits on the surface
-              instead of being stuck to it. Twelve pixels across on this dial is
-              plenty of room for all three. */}
+          {/* Built like a glass marble, which is four things and not one.
+              The body runs from a lit tint up and left down to a dark far limb.
+              A bounce rides the far rim: the light that has gone past the stone,
+              hit the surface under it and come back up, which is the whole reason
+              a glass bead looks lit from inside instead of painted. A broad soft
+              sheen sits over the top, wide and low-contrast rather than a hot dot,
+              because a small hard highlight makes plastic. And no outline at all:
+              a ring around a shaded sphere flattens it straight back to a sticker.
+              At twelve pixels every one of these is about two pixels of work, and
+              all four are needed for any of it to read. */}
           {!night &&
             planets.map((p) => (
               <radialGradient
@@ -850,15 +868,15 @@ export function OrreryDial({
                 id={`sphere-${p.name}-${uid}`}
                 cx="50%"
                 cy="50%"
-                r="74%"
-                fx="30%"
-                fy="24%"
+                r="80%"
+                fx="32%"
+                fy="26%"
               >
-                <stop offset="0%" stopColor={mixHex(p.tone, "white", 0.8)} />
-                <stop offset="22%" stopColor={mixHex(p.tone, "white", 0.34)} />
-                <stop offset="52%" stopColor={p.tone} />
-                <stop offset="82%" stopColor={mixHex(p.tone, "black", 0.28)} />
-                <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.5)} />
+                <stop offset="0%" stopColor={mixHex(p.tone, "white", 0.56)} />
+                <stop offset="30%" stopColor={mixHex(p.tone, "white", 0.16)} />
+                <stop offset="62%" stopColor={p.tone} />
+                <stop offset="88%" stopColor={mixHex(p.tone, "black", 0.34)} />
+                <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.54)} />
               </radialGradient>
             ))}
           {!night &&
@@ -866,13 +884,13 @@ export function OrreryDial({
               <radialGradient
                 key={`limb-${p.name}`}
                 id={`limb-${p.name}-${uid}`}
-                cx="50%"
-                cy="50%"
-                r="50%"
+                cx="34%"
+                cy="28%"
+                r="100%"
               >
-                <stop offset="62%" stopColor={mixHex(p.tone, "black", 0.62)} stopOpacity={0} />
-                <stop offset="88%" stopColor={mixHex(p.tone, "black", 0.62)} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={mixHex(p.tone, "black", 0.62)} stopOpacity={0.62} />
+                <stop offset="84%" stopColor={mixHex(p.tone, "white", 0.62)} stopOpacity={0} />
+                <stop offset="95%" stopColor={mixHex(p.tone, "white", 0.62)} stopOpacity={0.32} />
+                <stop offset="100%" stopColor={mixHex(p.tone, "white", 0.7)} stopOpacity={0.5} />
               </radialGradient>
             ))}
           {/* Bands, for the two bodies that have them to show. At this size they
@@ -901,8 +919,8 @@ export function OrreryDial({
               ))}
           {!night && (
             <radialGradient id={`spec-${uid}`} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.9} />
-              <stop offset="55%" stopColor="#ffffff" stopOpacity={0.45} />
+              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.5} />
+              <stop offset="45%" stopColor="#ffffff" stopOpacity={0.28} />
               <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
             </radialGradient>
           )}
@@ -1148,7 +1166,7 @@ export function OrreryDial({
                             opacity={0.75}
                             style={{ fontSize: 10 }}
                           >
-                            {p.nameRu}
+                            {en(p.nameRu)}
                           </text>
                         )}
                       </g>
@@ -1459,14 +1477,15 @@ export function OrreryDial({
                   x2={pt.x}
                   y2={pt.y}
                 >
-                  {/* Grey on paper, the body's own tint at night. Once the day
-                      planets wear their real colours, a matching trail puts a
-                      second pale cream stroke on white paper and Venus loses its
-                      path altogether. Grey also stops the trail competing for the
-                      identity the disc now carries on its own. */}
-                  <stop offset="0%" stopColor={night ? p.tone : TRAIL_DAY} stopOpacity={0} />
-                  <stop offset="55%" stopColor={night ? p.tone : TRAIL_DAY} stopOpacity={isHover ? (night ? 0.55 : 0.55) : night ? 0.3 : 0.32} />
-                  <stop offset="100%" stopColor={night ? p.tone : TRAIL_DAY} stopOpacity={isHover ? 1 : night ? 0.85 : 0.75} />
+                  {/* Mostly grey on paper, a third of the way to the body's own
+                      colour. A full-strength tint puts a second pale cream stroke
+                      on parchment and Venus loses its path altogether; flat grey
+                      cuts the path loose from the planet it belongs to. A third
+                      is enough to tell whose trail it is without the trail
+                      competing for the identity the disc already carries. */}
+                  <stop offset="0%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, p.tone, 0.34)} stopOpacity={0} />
+                  <stop offset="55%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, p.tone, 0.34)} stopOpacity={isHover ? (night ? 0.55 : 0.58) : night ? 0.3 : 0.36} />
+                  <stop offset="100%" stopColor={night ? p.tone : blendHex(TRAIL_DAY, p.tone, 0.34)} stopOpacity={isHover ? 1 : night ? 0.85 : 0.8} />
                 </linearGradient>
               </defs>
               {!p.isMoon && (
@@ -1520,13 +1539,13 @@ export function OrreryDial({
                   <>
                     <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#sphere-${p.name}-${uid})`} />
                     <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#limb-${p.name}-${uid})`} />
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={2.4}
-                      fill="none"
-                      stroke={rimFor(p.tone)}
-                      strokeWidth={0.6}
+                    <ellipse
+                      cx={pt.x - 0.62}
+                      cy={pt.y - 0.75}
+                      rx={1.02}
+                      ry={0.68}
+                      transform={`rotate(-34 ${pt.x - 0.62} ${pt.y - 0.75})`}
+                      fill={`url(#spec-${uid})`}
                     />
                   </>
                 )
@@ -1575,17 +1594,15 @@ export function OrreryDial({
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={inLitHouse ? (p.isEarth ? 6.4 : 6.8) : p.isEarth ? 4.2 : 4.6}
+                    r={inLitHouse ? (p.isEarth ? 6.4 : 6.8) : p.isEarth ? 3.7 : 4.1}
                     // The lift is the body's own colour, only stronger. Gold said
                     // "selected" in a language nothing else on the dial speaks.
                     fill={p.tone}
                     filter={`url(#${inLitHouse ? "lift" : "body"}-glow-${uid})`}
-                    opacity={inLitHouse ? 0.7 : isHover ? 0.55 : 0.38}
+                    opacity={inLitHouse ? 0.7 : isHover ? 0.42 : 0.26}
                   />
-                  {/* A shaded sphere, not a ring around the paper. Lit, then
-                      banded if it has bands, then darkened at the limb, then a
-                      specular, then a rim in the body's own colour darkened
-                      rather than a second hue. */}
+                  {/* Lit, banded if it has bands, bounce on the far rim, sheen
+                      over the top. The edge is where the shading runs out. */}
                   <circle
                     cx={pt.x}
                     cy={pt.y}
@@ -1599,7 +1616,7 @@ export function OrreryDial({
                       cy={pt.y}
                       r={3.7}
                       fill={`url(#bands-${p.name}-${uid})`}
-                      opacity={0.45}
+                      opacity={0.3}
                     />
                   )}
                   <circle
@@ -1608,14 +1625,13 @@ export function OrreryDial({
                     r={p.isEarth ? 3.2 : 3.7}
                     fill={`url(#limb-${p.name}-${uid})`}
                   />
-                  <circle
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={p.isEarth ? 3.2 : 3.7}
-                    fill="none"
-                    stroke={rimFor(p.tone)}
-                    strokeWidth={0.7}
-                    opacity={isHover ? 1 : 0.95}
+                  <ellipse
+                    cx={pt.x - (p.isEarth ? 0.85 : 1)}
+                    cy={pt.y - (p.isEarth ? 1 : 1.15)}
+                    rx={p.isEarth ? 1.5 : 1.72}
+                    ry={p.isEarth ? 1 : 1.16}
+                    transform={`rotate(-34 ${pt.x - (p.isEarth ? 0.85 : 1)} ${pt.y - (p.isEarth ? 1 : 1.15)})`}
+                    fill={`url(#spec-${uid})`}
                   />
                   {/* The one planet whose shape is recognisable at four pixels.
                       Drawn across the disc rather than behind it: that is how a
@@ -1634,15 +1650,7 @@ export function OrreryDial({
                       opacity={isHover ? 0.95 : 0.8}
                     />
                   )}
-                  <ellipse
-                    cx={pt.x - (p.isEarth ? 0.95 : 1.1)}
-                    cy={pt.y - (p.isEarth ? 1.05 : 1.2)}
-                    rx={p.isEarth ? 1.05 : 1.2}
-                    ry={p.isEarth ? 0.72 : 0.82}
-                    transform={`rotate(-32 ${pt.x - (p.isEarth ? 0.95 : 1.1)} ${pt.y - (p.isEarth ? 1.05 : 1.2)})`}
-                    fill={`url(#spec-${uid})`}
-                    opacity={isHover ? 0.9 : 0.7}
-                  />
+
                 </>
               )}
             </g>
@@ -1673,7 +1681,7 @@ export function OrreryDial({
               className="text-sm font-medium"
               style={{ color: night ? "#ffffff" : "var(--foreground)" }}
             >
-              {ZODIAC_GLYPHS[signHover]} {ZODIAC_SIGNS_RU[signHover]}
+              {ZODIAC_GLYPHS[signHover]} {SIGNS_EN[signHover]}
             </div>
             {inside.length > 0 && (
               <div className="mt-1.5 flex flex-col gap-0.5">
@@ -1681,7 +1689,7 @@ export function OrreryDial({
                   <div key={p.nameRu} className="text-[11px] flex items-baseline gap-1.5">
                     <span style={{ color: p.tone }}>{p.glyph}</span>
                     <span style={{ color: night ? "rgba(255,255,255,0.9)" : "var(--foreground)" }}>
-                      {p.nameRu}
+                      {en(p.nameRu)}
                     </span>
                     <span
                       className="tabular-nums"
@@ -1693,7 +1701,7 @@ export function OrreryDial({
                       className="ml-auto"
                       style={{ color: night ? "rgba(255,255,255,0.5)" : "var(--muted)" }}
                     >
-                      {BODY_ROLE_RU[p.name] ?? ""}
+                      {ROLE_EN[p.name] ?? ""}
                     </span>
                   </div>
                 ))}
@@ -1703,7 +1711,7 @@ export function OrreryDial({
         );
       })()}
 
-      {houseHover !== null && (() => {
+      {personal && houseHover !== null && (() => {
         const cusp = NATAL_CUSPS[houseHover - 1];
         const next = NATAL_CUSPS[houseHover % 12];
         const span = (((next - cusp) % 360) + 360) % 360;
@@ -1731,7 +1739,7 @@ export function OrreryDial({
               className="text-sm font-medium"
               style={{ color: night ? "#ffffff" : "var(--foreground)" }}
             >
-              {toRoman(houseHover)} дом
+              House {toRoman(houseHover)}
             </div>
             <div
               className="text-[11px]"
@@ -1747,7 +1755,7 @@ export function OrreryDial({
                   <div key={p.nameRu} className="text-[11px] flex items-baseline gap-1.5">
                     <span style={{ color: p.tone }}>{p.glyph}</span>
                     <span style={{ color: night ? "rgba(255,255,255,0.9)" : "var(--foreground)" }}>
-                      {p.nameRu}
+                      {en(p.nameRu)}
                     </span>
                     <span
                       className="tabular-nums"
@@ -1760,7 +1768,7 @@ export function OrreryDial({
                       className="ml-auto"
                       style={{ color: night ? "rgba(255,255,255,0.5)" : "var(--muted)" }}
                     >
-                      {BODY_ROLE_RU[p.name] ?? ""}
+                      {ROLE_EN[p.name] ?? ""}
                     </span>
                   </div>
                 ))}
@@ -1918,7 +1926,7 @@ export function OrreryDial({
                   {hits.map((h, i) => (
                     <div key={i} className="text-[11px] flex items-baseline gap-1.5">
                       <span style={{ color: h.tone }}>{h.symbol}</span>
-                      <span style={{ color: ink }}>{h.label}</span>
+                      <span style={{ color: ink }}>{en(h.label)}</span>
                     </div>
                   ))}
                 </div>
