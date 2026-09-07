@@ -12,7 +12,7 @@ const C = SIZE / 2;
 // The disc is 230 across the radius and a body's glow reaches some eight px past
 // its ring, so Neptune at 212 fills the circle without touching the edge.
 const R_INNER = 54; // Mercury
-const R_OUTER = 198; // Neptune, pulled in to leave the rim breathing room
+const R_OUTER = 198; // Pluto, pulled in to leave the rim breathing room
 
 // Distances run 0.39 AU to 30 AU. Linear, Mercury through Mars collapse onto the
 // Sun; logarithmic, every orbit gets a readable gap. The dial trades true scale
@@ -25,26 +25,30 @@ const R_OUTER = 198; // Neptune, pulled in to leave the rim breathing room
  */
 const DAY_ANCHORS: [number, number][] = [
   [0.387, 0], // Mercury
-  [0.723, 0.11], // Venus
-  [1.0, 0.3], // Earth
-  [1.524, 0.45], // Mars
-  [5.203, 0.6], // Jupiter
-  [9.537, 0.73], // Saturn
-  [19.19, 0.87], // Uranus
-  [30.07, 1], // Neptune
+  [0.723, 0.1], // Venus
+  [1.0, 0.27], // Earth
+  [1.524, 0.4], // Mars
+  [5.203, 0.54], // Jupiter
+  [9.537, 0.66], // Saturn
+  [19.19, 0.78], // Uranus
+  [30.07, 0.9], // Neptune
+  // Pluto's distance inside the window. Over its orbit it runs 30 to 49 AU, and
+  // past the last anchor the fraction clamps at 1, so the ring stays the rim.
+  [35.7, 1], // Pluto
 ];
 
 /** Night keeps the logarithmic spacing, with one hand adjustment: Venus pulled
     in toward Mercury, which the pure log leaves oddly far out. */
 const NIGHT_ANCHORS: [number, number][] = [
   [0.387, 0], // Mercury
-  [0.723, 0.095], // Venus, log would put it at 0.144
-  [1.0, 0.218], // Earth
-  [1.524, 0.315], // Mars
-  [5.203, 0.597], // Jupiter
-  [9.537, 0.736], // Saturn
-  [19.19, 0.897], // Uranus
-  [30.07, 1], // Neptune
+  [0.723, 0.09], // Venus, log would put it at 0.135
+  [1.0, 0.2], // Earth
+  [1.524, 0.29], // Mars
+  [5.203, 0.55], // Jupiter
+  [9.537, 0.68], // Saturn
+  [19.19, 0.82], // Uranus
+  [30.07, 0.92], // Neptune
+  [35.7, 1], // Pluto, see the day table
 ];
 
 function anchorFraction(au: number, pts: [number, number][]): number {
@@ -285,18 +289,34 @@ type Relation = {
   nearness: number;
 };
 
-function findRelations(planets: HelioPos[]): Relation[] {
-  const withGeo = planets.filter((p) => !p.isEarth && p.geoLon != null);
+/**
+ * Where the angle is measured from. From the Sun it is the angle between the
+ * bodies' heliocentric longitudes, which is exactly what the dial draws: the
+ * arc and the number agree, Earth is a body like the rest and the Sun, being
+ * the vertex, is not one. From Earth it is the angle an observer here sees,
+ * between geocentric longitudes; the Sun joins as a body and Earth drops out,
+ * and the arc on the heliocentric dial no longer shows the angle it labels.
+ */
+export type Frame = "sun" | "earth";
+
+function findRelations(planets: HelioPos[], frame: Frame): Relation[] {
+  // The Moon has no heliocentric longitude of its own worth an angle; it stays
+  // in the Earth frame only.
+  const bodies =
+    frame === "sun"
+      ? planets.filter((p) => !p.isMoon && p.name !== "Sun")
+      : planets.filter((p) => !p.isEarth && p.geoLon != null);
+  const lonOf = (p: HelioPos) => (frame === "sun" ? p.lon : p.geoLon!);
   const out: Relation[] = [];
-  for (let i = 0; i < withGeo.length; i++) {
-    for (let j = i + 1; j < withGeo.length; j++) {
-      const d = angularDiff(withGeo[i].geoLon!, withGeo[j].geoLon!);
+  for (let i = 0; i < bodies.length; i++) {
+    for (let j = i + 1; j < bodies.length; j++) {
+      const d = angularDiff(lonOf(bodies[i]), lonOf(bodies[j]));
       for (const rel of RELATIONS) {
         const deviation = d - rel.angle;
         if (Math.abs(deviation) <= RELATION_CUTOFF_DEG)
           out.push({
-            a: withGeo[i],
-            b: withGeo[j],
+            a: bodies[i],
+            b: bodies[j],
             rel,
             angle: d,
             deviation,
@@ -417,6 +437,7 @@ const toneVars = (night: boolean): CSSProperties =>
     "--planet-saturn": planetTone("Saturn", night),
     "--planet-uranus": planetTone("Uranus", night),
     "--planet-neptune": planetTone("Neptune", night),
+    "--planet-pluto": planetTone("Pluto", night),
     "--accent": planetTone("Earth", night),
   }) as CSSProperties;
 
@@ -426,6 +447,7 @@ export function OrreryDial({
   variant = "auto",
   wheelScrub = true,
   lit = [],
+  frame = "sun",
 }: {
   planets: HelioPos[];
   /** The dial is drawn at 460 and scales down; inside a column it wants a cap. */
@@ -439,6 +461,8 @@ export function OrreryDial({
       and everyone else steps back, so a pair named elsewhere on the page can
       be found on the dial without hunting. */
   lit?: string[];
+  /** Vertex of every angle: the Sun, matching the drawing, or Earth. */
+  frame?: Frame;
 }) {
   const isDark = useIsDark();
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -469,7 +493,10 @@ export function OrreryDial({
     } as HelioPos;
   })();
 
-  const skyRelations = findRelations(sunBody ? [...planets, sunBody] : planets);
+  const skyRelations = findRelations(
+    frame === "earth" && sunBody ? [...planets, sunBody] : planets,
+    frame
+  );
 
   /**
    * Whether a relation gets a line. The Moon laps the circle in a month and
@@ -480,6 +507,7 @@ export function OrreryDial({
    */
   const drawn = (r: Relation) =>
     !(
+      frame === "earth" &&
       r.rel.key === "same" &&
       (r.a.isMoon || r.b.isMoon || r.a.name === "Mercury" || r.b.name === "Mercury")
     );
@@ -1291,8 +1319,8 @@ export function OrreryDial({
       </svg>
 
       {activeRelation && (() => {
-        const pa = pointAt(activeRelation.a.lon, radiusFor(activeRelation.a.au, night));
-        const pb = pointAt(activeRelation.b.lon, radiusFor(activeRelation.b.au, night));
+        const pa = dialPoint(activeRelation.a, earthPos, night);
+        const pb = dialPoint(activeRelation.b, earthPos, night);
         const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
         return (
           <div
@@ -1313,7 +1341,7 @@ export function OrreryDial({
               {deviationLabel(activeRelation.rel, activeRelation.deviation)}
             </div>
             <div className="text-[11px] tabular-nums" style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
-              measured {activeRelation.angle.toFixed(1)}° · exact {activeRelation.rel.angle}°
+              {frame === "sun" ? "from the Sun" : "from Earth"} · measured {activeRelation.angle.toFixed(1)}° · exact {activeRelation.rel.angle}°
             </div>
           </div>
         );

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { OrreryDial } from "./OrreryDial";
+import type { Frame } from "./OrreryDial";
 import { RatioPanel } from "./RatioPanel";
 import { helioPositions } from "@/lib/helio";
 import type { Ratio } from "@/lib/periods";
@@ -41,6 +42,9 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
   const { selected, setSelected, today: todayDate } = useSelectedDate();
   // Bodies the ratio panel is pointing at; the dial lifts them.
   const [lit, setLit] = useState<string[]>([]);
+  // Where every angle has its vertex. From the Sun by default, because that is
+  // what the dial draws; from Earth is what an observer here would measure.
+  const [frame, setFrame] = useState<Frame>("sun");
   const todayMs = todayDate.getTime();
   const [dragging, setDragging] = useState(false);
   const root = useRef<HTMLDivElement | null>(null);
@@ -318,6 +322,17 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
         ref={root}
         className="relative h-[100dvh] w-full flex flex-col items-center px-4 pt-5 pb-4 overscroll-none"
       >
+        {/* Under the theme switch, in its clothes: the other thing on the page
+            that has two states and no third. */}
+        <button
+          type="button"
+          onClick={() => setFrame((f) => (f === "sun" ? "earth" : "sun"))}
+          title="Measure the angles from the Sun or from Earth"
+          aria-label="Switch the vertex of the angles between the Sun and Earth"
+          className="absolute right-4 top-14 z-10 flex items-center gap-2 rounded-full border border-[color:var(--border)] hover:border-[color:var(--border-strong)] transition-colors text-[color:var(--muted-strong)] px-3 h-8 cursor-pointer"
+        >
+          <span className="label">{frame === "sun" ? "from the Sun" : "from Earth"}</span>
+        </button>
         <header className="flex flex-col items-center gap-1 shrink-0">
           {/* The only text on the page. It is the readout for the wheel, and
               knowing where you have scrolled to is the whole interaction. The
@@ -369,6 +384,7 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
               maxWidth={1400}
               wheelScrub={false}
               lit={lit}
+              frame={frame}
             />
           </div>
         </div>

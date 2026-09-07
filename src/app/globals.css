@@ -39,6 +39,7 @@
   --planet-saturn: #93885a;
   --planet-uranus: #5d8b89;
   --planet-neptune: #5f6c96;
+  --planet-pluto: #8f7460;
 }
 
 /* Dark palette shared by explicit and system preference.
@@ -71,6 +72,7 @@
   --planet-saturn: #bfb488;
   --planet-uranus: #8bb8b4;
   --planet-neptune: #98a4cc;
+  --planet-pluto: #a99cc4;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -101,6 +103,7 @@
     --planet-saturn: #bfb488;
     --planet-uranus: #8bb8b4;
     --planet-neptune: #98a4cc;
+    --planet-pluto: #a99cc4;
   }
 }
 

@@ -1,7 +1,9 @@
 import { Body, MakeTime, HelioVector, HelioDistance, GeoVector, Ecliptic } from "astronomy-engine";
 
 /** The Sun's own planets, in orbital order. Earth is here too — on this dial it
-    is a planet like the rest, not the vantage point. */
+    is a planet like the rest, not the vantage point. Pluto as well: whatever the
+    vote of 2006 called it, it is a body on a solar orbit with a period that
+    stands in a 3:2 ratio to Neptune's, and that ratio is half the point. */
 const PLANETS = [
   { body: Body.Mercury, nameRu: "Меркурий", tone: "var(--planet-mercury)" },
   { body: Body.Venus, nameRu: "Венера", tone: "var(--planet-venus)" },
@@ -11,6 +13,7 @@ const PLANETS = [
   { body: Body.Saturn, nameRu: "Сатурн", tone: "var(--planet-saturn)" },
   { body: Body.Uranus, nameRu: "Уран", tone: "var(--planet-uranus)" },
   { body: Body.Neptune, nameRu: "Нептун", tone: "var(--planet-neptune)" },
+  { body: Body.Pluto, nameRu: "Плутон", tone: "var(--planet-pluto)" },
 ] as const;
 
 export type HelioPos = {
