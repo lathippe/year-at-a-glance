@@ -27,8 +27,8 @@ export type HelioPos = {
   /** Degrees of heliocentric longitude per day, measured over the last ten
       days. Heliocentric motion never goes retrograde, so this is always > 0. */
   degPerDay: number;
-  /** Ecliptic longitude as seen from Earth. This is the astrological position,
-      the one aspects are measured in. Null for Earth itself. */
+  /** Ecliptic longitude as seen from Earth, the frame the relations between
+      bodies are measured in. Null for Earth itself. */
   geoLon: number | null;
   signIdx: number;
   degreeInSign: number;

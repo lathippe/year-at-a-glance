@@ -25,11 +25,6 @@
 
   --positive: #4caf50;
   --negative: #a04040;
-  /* The aspect palette needs its three tones to weigh the same. --negative is a
-     deep brick, right for a warning number but far darker than the turquoise and
-     the violet, so two aspects of equal strength looked unequal. This is the same
-     red brought up to their lightness. */
-  --aspect-negative: #cf6b62;
 
   --surface-hover: #ffffff;
 
@@ -66,7 +61,6 @@
 
   --positive: #89b482;
   --negative: #ea6962;
-  --aspect-negative: #ea6962;
 
   --surface-hover: #1c1917;
 
@@ -97,7 +91,6 @@
 
     --positive: #89b482;
     --negative: #ea6962;
-    --aspect-negative: #ea6962;
 
     --surface-hover: #1c1917;
 

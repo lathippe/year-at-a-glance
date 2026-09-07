@@ -10,19 +10,6 @@ import { blendHex, mixHex, planetTone, rimFor } from "@/lib/planetTones";
 /** The twelve signs on the rim, in order from 0°. */
 const ZODIAC_GLYPHS = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"] as const;
 
-/** Tone of an aspect: sextile and trine flow, square and opposition grind,
-    conjunction stays neutral because its character depends on the bodies. */
-type AspectTone = "positive" | "negative" | "neutral";
-function aspectTone(name: string): AspectTone {
-  if (name === "sextile" || name === "trine") return "positive";
-  if (name === "square" || name === "opposition") return "negative";
-  return "neutral";
-}
-const ASPECT_TONE_COLOR: Record<AspectTone, string> = {
-  positive: "#4db8b0",
-  negative: "var(--aspect-negative)",
-  neutral: "#8b7fa8",
-};
 
 const SIZE = 460;
 const C = SIZE / 2;
@@ -152,25 +139,36 @@ function trailPath(lon: number, r: number, deg: number): string {
   return pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
 }
 
-/** Major aspects, the astrological ones. Measured between geocentric
-    longitudes, because an aspect is an angle seen from Earth, not from the Sun. */
-const ASPECTS = [
-  { name: "conjunction", nameRu: "соединение", angle: 0, symbol: "☌" },
-  { name: "sextile", nameRu: "секстиль", angle: 60, symbol: "⚹" },
-  { name: "square", nameRu: "квадрат", angle: 90, symbol: "□" },
-  { name: "trine", nameRu: "тригон", angle: 120, symbol: "△" },
-  { name: "opposition", nameRu: "оппозиция", angle: 180, symbol: "☍" },
+/** The simple fractions of a circle. Measured between geocentric longitudes:
+    the angle is the one seen from Earth, not from the Sun. Zero is listed as a
+    fraction too, since two bodies at the same longitude are the limiting case
+    of the same idea. */
+const RELATIONS = [
+  { key: "same", label: "coincidence", angle: 0 },
+  { key: "sixth", label: "1/6", angle: 60 },
+  { key: "quarter", label: "1/4", angle: 90 },
+  { key: "third", label: "1/3", angle: 120 },
+  { key: "half", label: "1/2", angle: 180 },
 ] as const;
-const ASPECT_ORB = 6;
+type RelationDef = (typeof RELATIONS)[number];
+/** How far off a fraction a pair may stand and still be drawn. A rendering
+    cutoff for legibility, nothing more: past it the line would be too faint to
+    read. Every threshold in this file is this one. */
+const RELATION_CUTOFF_DEG = 6;
+
+/** How a fraction is written next to its size in degrees. */
+function relationLabel(rel: RelationDef): string {
+  return rel.angle === 0 ? "coincidence" : `${rel.label} of a circle · ${rel.angle}°`;
+}
 
 /** Radius of the rim the sign glyphs sit inside. */
 const R_RING = 224;
 
-/** Tension. Red rather than the burnt orange picked first for colour-blindness:
-    on a black sky that orange read as gold, which is the colour of something
-    good. Red scores better on both counts at once — against the turquoise of
-    harmony 15.1 → 19.8 under deuteranopia, against the Sun's gold 15.1 → 26.4. */
-const TENSION_INK = { day: "#b8392b", night: "#d24a3a" };
+/** One ink for every relation. Colour used to say which kind of angle it was,
+    which is a verdict; the number says it now. Neutral so it never competes
+    with the planet tints, and a step darker than the rim on paper because a
+    thin line on white needs more weight than the same line on black. */
+const RELATION_INK = { day: "#3f4650", night: "#d5dbe6" };
 
 /** Muted on purpose: the rim may not compete with the planet tints. */
 const ZODIAC_INK = { day: "#6f7b88", night: "#8b95a3" };
@@ -216,40 +214,24 @@ function bodyInk(p: HelioPos, night: boolean): string {
   return p.tone;
 }
 
-type AspectHit = { symbol: string; tone: string; label: string; strength: number };
+type RelationHit = { rel: RelationDef; label: string; strength: number };
 
-/** How much an aspect is worth saying out loud. Hard angles outrank soft ones,
-    and a tight orb outranks a wide one. */
-const ASPECT_WEIGHT: Record<string, number> = {
-  conjunction: 1,
-  opposition: 0.92,
-  square: 0.86,
-  trine: 0.78,
-  sextile: 0.62,
-};
+/** How near a pair stands to the fraction, 1 exact, 0 at the cutoff. The only
+    thing that ranks a relation: no kind of angle outranks another. */
 const MIN_STRENGTH = 0.3;
 
-function strengthOf(name: string, orb: number): number {
-  return (ASPECT_WEIGHT[name] ?? 0.7) * (1 - orb / ASPECT_ORB);
+function strengthOf(off: number): number {
+  return 1 - off / RELATION_CUTOFF_DEG;
 }
 
-/** Everything a body is in aspect to in the sky. Weak ones are dropped rather
-    than listed: a six-degree sextile is noise. */
-function aspectsOf(
-  p: HelioPos,
-  sky: { a: HelioPos; b: HelioPos; name: string; symbol: string; tone: string; orb: number }[]
-): AspectHit[] {
-  const inSky: AspectHit[] = [];
-  for (const asp of sky) {
-    const other =
-      asp.a.nameRu === p.nameRu ? asp.b : asp.b.nameRu === p.nameRu ? asp.a : null;
+/** Every relation a body stands in. Loose ones are dropped rather than listed:
+    six degrees off a sixth is noise. */
+function relationsOf(p: HelioPos, sky: Relation[]): RelationHit[] {
+  const inSky: RelationHit[] = [];
+  for (const r of sky) {
+    const other = r.a.nameRu === p.nameRu ? r.b : r.b.nameRu === p.nameRu ? r.a : null;
     if (!other) continue;
-    inSky.push({
-      symbol: asp.symbol,
-      tone: asp.tone,
-      label: other.nameRu,
-      strength: strengthOf(asp.name, asp.orb),
-    });
+    inSky.push({ rel: r.rel, label: other.nameRu, strength: strengthOf(r.off) });
   }
   return inSky
     .filter((x) => x.strength >= MIN_STRENGTH)
@@ -257,8 +239,8 @@ function aspectsOf(
     .slice(0, 5);
 }
 
-/** Distance from a point to a segment. The aspect chords carry no marker any
-    more, so the line itself has to be the hit area. */
+/** Distance from a point to a segment. The relation lines carry no marker, so
+    the line itself has to be the hit area. */
 function distToSegment(
   px: number, py: number, ax: number, ay: number, bx: number, by: number
 ): number {
@@ -274,27 +256,23 @@ function angularDiff(a: number, b: number): number {
   return d > 180 ? 360 - d : d;
 }
 
-function findAspects(planets: HelioPos[]) {
+type Relation = {
+  a: HelioPos;
+  b: HelioPos;
+  rel: RelationDef;
+  /** How far off the fraction the pair stands, degrees, unsigned. */
+  off: number;
+};
+
+function findRelations(planets: HelioPos[]): Relation[] {
   const withGeo = planets.filter((p) => !p.isEarth && p.geoLon != null);
-  const out: {
-    a: HelioPos; b: HelioPos; name: string; symbol: string; nameRu: string; tone: string; orb: number;
-  }[] = [];
+  const out: Relation[] = [];
   for (let i = 0; i < withGeo.length; i++) {
     for (let j = i + 1; j < withGeo.length; j++) {
       const d = angularDiff(withGeo[i].geoLon!, withGeo[j].geoLon!);
-      for (const asp of ASPECTS) {
-        const orb = Math.abs(d - asp.angle);
-        if (orb <= ASPECT_ORB) {
-          out.push({
-            a: withGeo[i],
-            b: withGeo[j],
-            name: asp.name,
-            symbol: asp.symbol,
-            nameRu: asp.nameRu,
-            tone: ASPECT_TONE_COLOR[aspectTone(asp.name)],
-            orb,
-          });
-        }
+      for (const rel of RELATIONS) {
+        const off = Math.abs(d - rel.angle);
+        if (off <= RELATION_CUTOFF_DEG) out.push({ a: withGeo[i], b: withGeo[j], rel, off });
       }
     }
   }
@@ -375,8 +353,6 @@ const EN: Record<string, string> = {
   "Солнце": "Sun", "Луна": "Moon", "Меркурий": "Mercury", "Венера": "Venus",
   "Земля": "Earth", "Марс": "Mars", "Юпитер": "Jupiter", "Сатурн": "Saturn",
   "Уран": "Uranus", "Нептун": "Neptune", "Плутон": "Pluto",
-  "соединение": "conjunction", "секстиль": "sextile", "квадрат": "square",
-  "тригон": "trine", "оппозиция": "opposition",
 };
 /** The engine names everything in Russian, so every string on its way to the
     screen goes through here. Renaming the ephemeris for the sake of one English
@@ -395,21 +371,6 @@ const SIGNS_EN = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra"
 function toneHex(name: string, night: boolean): string {
   return planetTone(name, night);
 }
-
-const ROLE_EN: Record<string, string> = {
-  Sun: "vitality",
-  Moon: "emotion",
-  Mercury: "thought",
-  Venus: "love and values",
-  Mars: "action",
-  Jupiter: "growth",
-  Saturn: "structure",
-  Uranus: "change",
-  Neptune: "intuition",
-  Pluto: "transformation",
-};
-
-const SIGNS = ["Овен", "Телец", "Близнецы", "Рак", "Лев", "Дева", "Весы", "Скорпион", "Стрелец", "Козерог", "Водолей", "Рыбы"];
 
 /** Two skies. Night is the Solar Walk field: deep space, stars, bodies in the
     dark-theme tints. Day is the same dial on paper — no stars, darker tints,
@@ -451,18 +412,16 @@ export function OrreryDial({
   const isDark = useIsDark();
   const svgRef = useRef<SVGSVGElement | null>(null);
   const night = variant === "auto" ? isDark : variant === "night";
-  /** Aspect lines are a layer, off until asked for: click the Sun for all of
+  /** Relation lines are a layer, off until asked for: click the Sun for all of
       them, or a planet for its own. On first sight the dial should be the sky,
-      not a web of chords. */
-  // Off until asked for, on every chart. The dial should first read as the sky;
-  // the aspects are a second layer over it and the Sun is the switch.
-  const [aspectsVisible, setAspectsVisible] = useState(false);
+      not a web of chords. The Sun is the switch. */
+  const [relationsVisible, setRelationsVisible] = useState(false);
 
   // The Sun has no place in a heliocentric list — it is the middle — so it was
-  // missing from the aspect web entirely, and its aspects are among the ones
+  // missing from the web entirely, and the angles it makes are among the ones
   // that matter most. Seen from Earth it stands exactly opposite Earth's own
-  // heliocentric longitude, which is all the engine needs. Added for aspects
-  // only, never drawn as a planet.
+  // heliocentric longitude, which is all the engine needs. Added for the
+  // relations only, never drawn as a planet.
   const sunBody = (() => {
     const e = planets.find((p) => p.isEarth);
     if (!e) return null;
@@ -480,25 +439,23 @@ export function OrreryDial({
     } as HelioPos;
   })();
 
-  const skyAspects = findAspects(sunBody ? [...planets, sunBody] : planets);
+  const skyRelations = findRelations(sunBody ? [...planets, sunBody] : planets);
 
   /**
-   * Whether an aspect gets a line. The Moon laps the zodiac in a month and
-   * Mercury never leaves the Sun's side, so their conjunctions are almost always
-   * on and crowd out the aspects that are actually news. They keep their place
-   * in the cards — the fact is true and worth reading — they just stop being
-   * drawn.
+   * Whether a relation gets a line. The Moon laps the circle in a month and
+   * Mercury never leaves the Sun's side, so their coincidences are almost
+   * always on and crowd out the angles that are actually news. They keep their
+   * place in the cards — the fact is true and worth reading — they just stop
+   * being drawn.
    */
-  const drawn = (a: { name: string; a: HelioPos; b: HelioPos }) =>
+  const drawn = (r: Relation) =>
     !(
-      a.name === "conjunction" &&
-      (a.a.isMoon || a.b.isMoon || a.a.name === "Mercury" || a.b.name === "Mercury")
+      r.rel.key === "same" &&
+      (r.a.isMoon || r.b.isMoon || r.a.name === "Mercury" || r.b.name === "Mercury")
     );
-  // Drawn only on the paper sky; the card uses the full list in both.
-  // Endpoints of an aspect: at the bodies themselves, or at their marks on the
-  // geocentric rim.
-  const aspectEnds = (asp: { a: HelioPos; b: HelioPos }) =>
-    [dialPoint(asp.a, earthPos, night), dialPoint(asp.b, earthPos, night)] as const;
+  // Endpoints of a relation: the two bodies where they stand.
+  const relationEnds = (r: { a: HelioPos; b: HelioPos }) =>
+    [dialPoint(r.a, earthPos, night), dialPoint(r.b, earthPos, night)] as const;
 
   // Two dials can share a page, and SVG ids are global to the document.
   const uid = variant === "auto" ? (night ? "auto-night" : "auto-day") : variant;
@@ -507,23 +464,23 @@ export function OrreryDial({
   // there is no hover to follow, so the card belongs to whatever is pinned.
   const [touchMode, setTouchMode] = useState(false);
   const [pinned, setPinned] = useState<string | null>(null);
-  // Pinning a planet narrows the layer to that body's own aspects; with nothing
-  // pinned the whole web is drawn. The Sun switches the layer off entirely.
+  // Pinning a planet narrows the layer to that body's own relations; with
+  // nothing pinned the whole web is drawn. The Sun switches the layer off.
   const pinnedPlanet =
-    pinned && !pinned.startsWith("asp:") && planets.some((p) => p.nameRu === pinned)
+    pinned && !pinned.startsWith("rel:") && planets.some((p) => p.nameRu === pinned)
       ? pinned
       : null;
   const hoveredBody =
-    hover && !hover.startsWith("asp:") ? hover : null;
-  const aspects = aspectsVisible
+    hover && !hover.startsWith("rel:") ? hover : null;
+  const relations = relationsVisible
     ? pinnedPlanet
-      ? skyAspects.filter((a) => a.a.nameRu === pinnedPlanet || a.b.nameRu === pinnedPlanet)
-      : skyAspects
+      ? skyRelations.filter((r) => r.a.nameRu === pinnedPlanet || r.b.nameRu === pinnedPlanet)
+      : skyRelations
     : // The layer is off by default, which meant hovering a planet lit nothing:
       // there were no chords in the drawing to light. Hovering now reveals that
-      // one body's aspects for as long as the pointer stays. Clicking keeps them.
+      // one body's relations for as long as the pointer stays. Clicking keeps them.
     hoveredBody
-    ? skyAspects.filter((a) => a.a.nameRu === hoveredBody || a.b.nameRu === hoveredBody)
+    ? skyRelations.filter((r) => r.a.nameRu === hoveredBody || r.b.nameRu === hoveredBody)
     : [];
 
   const [signHover, setSignHover] = useState<number | null>(null);
@@ -557,7 +514,7 @@ export function OrreryDial({
   // the only name: it has to survive the pointer leaving.
   // Two different jobs. `shown` drives the lit state on the dial and survives a
   // click, because that is what a pin is for. The card follows the pointer only:
-  // a click changes which aspects are drawn, and taking the mouse away puts the
+  // a click changes which relations are drawn, and taking the mouse away puts the
   // card back, pinned or not.
   // Per-body enter/leave dropped events: the bodies are two pixels wide, they
   // sit under a mask, and a fast exit could leave the card pinned to a planet the
@@ -602,13 +559,13 @@ export function OrreryDial({
       bestScore = sunScore;
       best = "Солнце";
     }
-    aspects.forEach((asp, i) => {
-      if (!drawn(asp)) return;
-      const [pa, pb] = aspectEnds(asp);
+    relations.forEach((r, i) => {
+      if (!drawn(r)) return;
+      const [pa, pb] = relationEnds(r);
       const score = distToSegment(x, y, pa.x, pa.y, pb.x, pb.y) / chordReach;
       if (score < bestScore) {
         bestScore = score;
-        best = `asp:${i}`;
+        best = `rel:${i}`;
       }
     });
     return best;
@@ -619,8 +576,8 @@ export function OrreryDial({
 
 
   const active = planets.find((p) => p.nameRu === cardKey) ?? null;
-  const activeAspect = cardKey?.startsWith("asp:")
-    ? aspects[Number(cardKey.slice(4))] ?? null
+  const activeRelation = cardKey?.startsWith("rel:")
+    ? relations[Number(cardKey.slice(4))] ?? null
     : null;
   const earthPos = planets.find((p) => p.isEarth);
   const activePt = active ? dialPoint(active, earthPos, night) : null;
@@ -654,9 +611,9 @@ export function OrreryDial({
           setTouchMode(true);
           const hit = pickAt(e);
           setHover(hit);
-          if (hit && !hit.startsWith("asp:"))
-            setAspectsVisible(true);
-          else if (!hit) setAspectsVisible(false);
+          if (hit && !hit.startsWith("rel:"))
+            setRelationsVisible(true);
+          else if (!hit) setRelationsVisible(false);
           setPinned((s) => (hit ? (s === hit ? null : hit) : null));
         }}
         onPointerLeave={() => setHover(null)}
@@ -665,15 +622,15 @@ export function OrreryDial({
           // The touch path already ran on pointerdown; letting the synthetic
           // click through would undo the pin it just set.
           if ((e.nativeEvent as PointerEvent).pointerType !== "mouse" && touchMode) return;
-          // Clicking a body shows its aspects, even if the layer was switched off
+          // Clicking a body shows its relations, even if the layer was switched off
           // at the Sun a moment ago. Clicking nothing puts the layer away: the
           // bodies are four pixels wide, so a miss is the common way to be done
           // with a reading, and it used to leave every thread on screen with
           // nothing selected. The Sun stops propagation, so its own switch is
           // not caught by this.
-          if (hover && !hover.startsWith("asp:"))
-            setAspectsVisible(true);
-          else if (!hover) setAspectsVisible(false);
+          if (hover && !hover.startsWith("rel:"))
+            setRelationsVisible(true);
+          else if (!hover) setRelationsVisible(false);
           setPinned((s) => (hover ? (s === hover ? null : hover) : null));
         }}
       >
@@ -729,7 +686,7 @@ export function OrreryDial({
               design; reusing it for a halo three times the radius gave a hard
               bright disc instead of light. */}
           {/* Light around the filament, not a second brighter filament. */}
-          <filter id={`aspect-glow-${uid}`} x="-200%" y="-200%" width="500%" height="500%">
+          <filter id={`relation-glow-${uid}`} x="-200%" y="-200%" width="500%" height="500%">
             <feGaussianBlur stdDeviation="2.4" />
           </filter>
           <filter id={`lift-glow-${uid}`} x="-400%" y="-400%" width="900%" height="900%">
@@ -996,29 +953,21 @@ export function OrreryDial({
         {(() => {
             const earth = planets.find((p) => p.isEarth);
             if (!earth) return null;
-            // Widest orb first, so the tightest aspect wins the planet's colour.
-            const toneFor = new Map<string, string>();
-            for (const asp of [...aspects].sort((x, y) => y.orb - x.orb)) {
-              toneFor.set(asp.a.nameRu, asp.tone);
-              toneFor.set(asp.b.nameRu, asp.tone);
-            }
+            // Bodies standing in a drawn relation get their name under them.
+            const named = new Set<string>();
+            for (const r of relations) if (drawn(r)) { named.add(r.a.nameRu); named.add(r.b.nameRu); }
             return (
               <g>
                 {planets
                   .filter((p) => !p.isEarth)
                   .map((p) => {
                     const pt = dialPoint(p, earth, night);
-                    const tone = toneFor.get(p.nameRu);
                     return (
-                      <g key={`sight-${p.nameRu}`}>
-                        {/* Uniformly faint, whatever the planet is doing. These
-                            lines say one thing only: aspects are measured from
-                            Earth. Colouring them by aspect made the loudest mark
-                            on the dial the one carrying no meaning. */}
-                        {/* Only the bodies actually in an aspect are named, and
+                      <g key={`name-${p.nameRu}`}>
+                        {/* Only the bodies actually in a relation are named, and
                             quietly: the point is to read the pair, not to label
                             the sky. */}
-                        {tone && !p.isMoon && (
+                        {named.has(p.nameRu) && !p.isMoon && (
                           <text
                             x={pt.x}
                             y={pt.y + 13}
@@ -1033,36 +982,17 @@ export function OrreryDial({
                       </g>
                     );
                   })}
-                {aspects.map((asp, i) => {
-                  if (!drawn(asp)) return null;
+                {relations.map((r, i) => {
+                  if (!drawn(r)) return null;
                   // Pointing at a body lights everything it reaches, not just
-                  // the one chord under the cursor. "What is this planet in
-                  // aspect to" was the commonest question the web could not
+                  // the one line under the cursor. "What is this planet standing
+                  // in relation to" was the commonest question the web could not
                   // answer without tracing lines by eye.
                   const hot =
-                    shown === `asp:${i}` ||
-                    shown === asp.a.nameRu ||
-                    shown === asp.b.nameRu;
-                  const [pa, pb] = aspectEnds(asp);
-                  // One family, one parameter. Every aspect thins toward the
-                  // middle; how far it thins is the hardness of the aspect, and
-                  // that is a scale rather than a switch. A trine barely dips, an
-                  // opposition goes to nothing, a conjunction does not dip at all
-                  // because the two are in the same place to begin with.
-                  //
-                  // Breaking the harmonious ones outright was the alternative and
-                  // it is worse: the break is the only thing separating the two
-                  // kinds, so breaking both leaves nothing but hue to tell them
-                  // apart.
-                  const MID_OPACITY: Record<string, number> = {
-                    conjunction: 1,
-                    trine: 0.78,
-                    sextile: 0.58,
-                    square: 0.18,
-                    opposition: 0,
-                  };
-                  const mid = MID_OPACITY[asp.name] ?? 0.6;
-                  const tense = asp.name === "square" || asp.name === "opposition";
+                    shown === `rel:${i}` ||
+                    shown === r.a.nameRu ||
+                    shown === r.b.nameRu;
+                  const [pa, pb] = relationEnds(r);
                   const mx = (pa.x + pb.x) / 2;
                   const my = (pa.y + pb.y) / 2;
                   // Bowed away from the middle of the dial, so three of them can
@@ -1070,45 +1000,21 @@ export function OrreryDial({
                   const bx = mx + (mx - C) * 0.16;
                   const by = my + (my - C) * 0.16;
                   const arc = `M${pa.x} ${pa.y} Q${bx} ${by} ${pb.x} ${pb.y}`;
-                  // The break is a fade, not a cut. One line the whole way, gone
-                  // to nothing at the midpoint and gathering again toward each
-                  // body: the reach is continuous and only the meeting fails. A
-                  // hard gap read as two separate marks that happened to line up.
-                  const gid = `aspect-waist-${uid}-${i}`;
-                  const baseInk = tense
-                    ? night
-                      ? TENSION_INK.night
-                      : TENSION_INK.day
-                    : asp.tone;
-                  // A conjunction has no waist to draw, so it stays a flat stroke
-                  // and skips the gradient entirely.
-                  const ink = mid >= 1 ? baseInk : `url(#${gid})`;
+                  // One line, one ink, one weight. The waist that used to thin
+                  // toward the middle graded the kinds of angle against each
+                  // other, which is a reading; the number on the card is the
+                  // only thing that grades anything now.
+                  const ink = night ? RELATION_INK.night : RELATION_INK.day;
                   return (
-                    <g key={`asp-${i}`} style={{ transition: "opacity 120ms" }}>
-                      {mid < 1 && (
-                        <linearGradient
-                          id={gid}
-                          gradientUnits="userSpaceOnUse"
-                          x1={pa.x}
-                          y1={pa.y}
-                          x2={pb.x}
-                          y2={pb.y}
-                        >
-                          <stop offset="0%" stopColor={baseInk} stopOpacity={1} />
-                          <stop offset="26%" stopColor={baseInk} stopOpacity={(1 + mid) / 2} />
-                          <stop offset="50%" stopColor={baseInk} stopOpacity={mid} />
-                          <stop offset="74%" stopColor={baseInk} stopOpacity={(1 + mid) / 2} />
-                          <stop offset="100%" stopColor={baseInk} stopOpacity={1} />
-                        </linearGradient>
-                      )}
+                    <g key={`rel-${i}`} style={{ transition: "opacity 120ms" }}>
                       <path
                         d={arc}
                         fill="none"
                         stroke={ink}
                         strokeWidth={hot ? 3.4 : 1.9}
                         strokeLinecap="round"
-                        filter={`url(#aspect-glow-${uid})`}
-                        opacity={hot ? 0.4 : tense ? 0.15 : 0.12}
+                        filter={`url(#relation-glow-${uid})`}
+                        opacity={hot ? 0.4 : 0.12}
                       />
                       <path
                         d={arc}
@@ -1116,7 +1022,7 @@ export function OrreryDial({
                         stroke={ink}
                         strokeWidth={hot ? 1.1 : 0.6}
                         strokeLinecap="round"
-                        opacity={hot ? 0.85 : tense ? 0.38 : 0.3}
+                        opacity={hot ? 0.85 : 0.3}
                       />
                     </g>
                   );
@@ -1164,13 +1070,13 @@ export function OrreryDial({
           r={night ? 4.5 : 4.4}
           fill={night ? "#fff6d5" : "#f8c53c"}
           filter={`url(#body-glow-${uid})`}
-          opacity={night || aspectsVisible ? 1 : 0.45}
+          opacity={night || relationsVisible ? 1 : 0.45}
         />
         {/* On paper the body is solid yellow with no hot centre: a pale dot
             inside it read as a hole, not as heat. */}
         <circle cx={C} cy={C} r={night ? 2.8 : 3.4} fill={night ? "#ffffff" : "#f5b81d"} />
-        {/* The Sun is the switch for the aspect layer. Nothing else on the dial
-            is a control, and it sits where a legend would have gone. */}
+        {/* The Sun is the switch for the relation layer. Nothing else on the
+            dial is a control, and it sits where a legend would have gone. */}
         <circle
             cx={C}
             cy={C}
@@ -1179,10 +1085,10 @@ export function OrreryDial({
             style={{ cursor: "pointer" }}
             onClick={(e) => {
               e.stopPropagation();
-              setAspectsVisible((v) => !v);
+              setRelationsVisible((v) => !v);
             }}
           >
-            <title>{aspectsVisible ? "Hide aspects" : "Show aspects"}</title>
+            <title>{relationsVisible ? "Hide relations" : "Show relations"}</title>
           </circle>
 
         {planets.map((p, gi) => {
@@ -1436,22 +1342,16 @@ export function OrreryDial({
             {inside.length > 0 && (
               <div className="mt-1.5 flex flex-col gap-0.5">
                 {inside.map((p) => (
-                  <div key={p.nameRu} className="text-[11px] flex items-baseline gap-1.5">
-                    <span style={{ color: p.tone }}>{p.glyph}</span>
+                  <div key={p.nameRu} className="text-[11px] flex items-center gap-1.5">
+                    <span style={{ width: 6, height: 6, borderRadius: 6, background: p.tone, display: "inline-block" }} />
                     <span style={{ color: night ? "rgba(255,255,255,0.9)" : "var(--foreground)" }}>
                       {en(p.nameRu)}
                     </span>
                     <span
-                      className="tabular-nums"
+                      className="tabular-nums ml-auto"
                       style={{ color: night ? "rgba(255,255,255,0.5)" : "var(--muted)" }}
                     >
                       {Math.floor(p.degreeInSign)}°
-                    </span>
-                    <span
-                      className="ml-auto"
-                      style={{ color: night ? "rgba(255,255,255,0.5)" : "var(--muted)" }}
-                    >
-                      {ROLE_EN[p.name] ?? ""}
                     </span>
                   </div>
                 ))}
@@ -1461,9 +1361,9 @@ export function OrreryDial({
         );
       })()}
 
-      {activeAspect && (() => {
-        const pa = pointAt(activeAspect.a.lon, radiusFor(activeAspect.a.au, night));
-        const pb = pointAt(activeAspect.b.lon, radiusFor(activeAspect.b.au, night));
+      {activeRelation && (() => {
+        const pa = pointAt(activeRelation.a.lon, radiusFor(activeRelation.a.au, night));
+        const pb = pointAt(activeRelation.b.lon, radiusFor(activeRelation.b.au, night));
         const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
         return (
           <div
@@ -1477,12 +1377,11 @@ export function OrreryDial({
               width: 300,
             }}
           >
-            <div className="text-sm font-medium" style={{ color: activeAspect.tone }}>
-              {activeAspect.a.glyph} {en(activeAspect.a.nameRu)} {activeAspect.symbol}{" "}
-              {activeAspect.b.glyph} {en(activeAspect.b.nameRu)}
+            <div className="text-sm font-medium" style={{ color: night ? "#ffffff" : "var(--foreground)" }}>
+              {en(activeRelation.a.nameRu)} · {en(activeRelation.b.nameRu)}
             </div>
-            <div className="text-[10px] text-[color:var(--muted)] tabular-nums mt-0.5">
-              {en(activeAspect.nameRu)} · orb {activeAspect.orb.toFixed(1)}°
+            <div className="text-[11px] tabular-nums mt-0.5" style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
+              {relationLabel(activeRelation.rel)} · off by {activeRelation.off.toFixed(1)}°
             </div>
           </div>
         );
@@ -1500,9 +1399,8 @@ export function OrreryDial({
             minWidth: 230,
           }}
         >
-          {/* The name stays plain text. Colour on this dial means an aspect, and
-              a planet-tinted heading kept implying one. The tint goes on a dot
-              instead, where it only says which body this is. */}
+          {/* The name stays plain text; the tint goes on a dot, where it only
+              says which body this is. */}
           <div
             className="text-sm font-medium flex items-center gap-1.5"
             style={{ color: night ? "#ffffff" : "var(--foreground)" }}
@@ -1516,7 +1414,7 @@ export function OrreryDial({
                 display: "inline-block",
               }}
             />
-            {active.glyph} {en(active.nameRu)}
+            {en(active.nameRu)}
           </div>
           <div className="text-[11px] tabular-nums" style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
             {SIGNS_EN[active.signIdx]} {Math.floor(active.degreeInSign)}° ·{" "}
@@ -1527,26 +1425,23 @@ export function OrreryDial({
             °/day
           </div>
           {(() => {
-            const inSky = aspectsOf(active, skyAspects);
-            if (inSky.length === 0) return null;
+            const hits = relationsOf(active, skyRelations);
+            if (hits.length === 0) return null;
             const dim = night ? "rgba(255,255,255,0.4)" : "var(--muted)";
             const ink = night ? "rgba(255,255,255,0.85)" : "var(--foreground)";
-            const group = (title: string, hits: AspectHit[]) =>
-              hits.length === 0 ? null : (
-                <div className="flex flex-col gap-0.5">
-                  <div className="text-[9px] uppercase tracking-wide" style={{ color: dim }}>
-                    {title}
-                  </div>
-                  {hits.map((h, i) => (
-                    <div key={i} className="text-[11px] flex items-baseline gap-1.5">
-                      <span style={{ color: h.tone }}>{h.symbol}</span>
-                      <span style={{ color: ink }}>{en(h.label)}</span>
-                    </div>
-                  ))}
-                </div>
-              );
             return (
-              <div className="mt-1.5">{group("aspects", inSky)}</div>
+              <div className="mt-1.5 flex flex-col gap-0.5">
+                <div className="text-[9px] uppercase tracking-wide" style={{ color: dim }}>
+                  relations
+                </div>
+                {hits.map((h, i) => (
+                  <div key={i} className="text-[11px] flex items-baseline gap-1.5 tabular-nums">
+                    <span style={{ color: ink, minWidth: 34 }}>{h.rel.angle === 0 ? "same" : h.rel.label}</span>
+                    <span style={{ color: dim, minWidth: 30 }}>{h.rel.angle}°</span>
+                    <span style={{ color: ink }}>{en(h.label)}</span>
+                  </div>
+                ))}
+              </div>
             );
           })()}
         </div>

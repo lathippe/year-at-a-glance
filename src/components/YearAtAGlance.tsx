@@ -367,9 +367,9 @@ export function YearAtAGlance() {
           </div>
         </div>
 
-        {/* Just a ruler. The aspect bars that used to live here said the same
-            thing the dial says, one scroll away, and took a third of the cover
-            to say it. */}
+        {/* Just a ruler. The bars that used to live here said the same thing
+            the dial says, one scroll away, and took a third of the cover to say
+            it. */}
         <div className="w-full max-w-[54rem] shrink-0 select-none flex flex-col items-center gap-1">
           <div
             ref={track}
