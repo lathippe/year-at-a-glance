@@ -36,7 +36,7 @@ export function planetTone(bodyName: string, night: boolean): string {
 
 /**
  * Ink that stays legible on a disc of the given colour. The Sun and the Moon are
- * pale enough that white glyphs vanish on them, so anything light gets a dark
+ * pale enough that white marks vanish on them, so anything light gets a dark
  * brown instead of guessing per body.
  */
 export function inkOn(hex: string): string {
