@@ -617,9 +617,16 @@ export function OrreryDial({
       bestScore = sunScore;
       best = "Солнце";
     }
+    // A body under the pointer wins outright. Every line starts at a body, so
+    // at the body itself the line and the body were the same distance away and
+    // the pick alternated between them from one move to the next: the card
+    // flipped, the layer flipped with it, and the planet flickered.
+    if (best) return best;
     relations.forEach((r, i) => {
       if (!drawn(r)) return;
       const [pa, pb] = relationEnds(r);
+      // The stretch of line inside either body's own reach belongs to the body.
+      if (Math.hypot(pa.x - x, pa.y - y) < reach || Math.hypot(pb.x - x, pb.y - y) < reach) return;
       const score = distToSegment(x, y, pa.x, pa.y, pb.x, pb.y) / chordReach;
       if (score < bestScore) {
         bestScore = score;
