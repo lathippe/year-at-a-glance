@@ -165,7 +165,7 @@ const RELATION_CUTOFF_DEG = 6;
  */
 const RELATION_STYLE = {
   gamma: 1.5,
-  opacity: [0.12, 0.9] as const,
+  opacity: [0.12, 0.8] as const,
   width: [0.3, 0.75] as const,
   hotOpacity: [0.5, 1] as const,
   hotWidth: [0.5, 1.05] as const,
@@ -207,10 +207,16 @@ const RELATION_INK = { day: "#3f4650", night: "#d5dbe6" };
  * rather than blue so a line is never in Earth's colour. Both sets pass the
  * six checks against #f4f3f0 and #080a12 with every pair above 3:1.
  */
+// Chroma held near 0.13 in OKLCH: the saturated steps read as a horoscope's
+// coloured lines; these read as ink. The third is a yellow-green rather than
+// an aqua, and the quarter a brick red rather than an orange: yellow-green
+// against orange collapses under deutan vision (ΔE 2.5 to 5), so the warm
+// hue moved to red and dropped in lightness. Worst pair now ΔE 11.6 on paper
+// and 15.5 in the dark, every hue above 3:1 on its surface.
 const RELATION_HUE: Partial<Record<RelationDef["key"], { day: string; night: string }>> = {
-  half: { day: "#4a3aa7", night: "#9085e9" },
-  third: { day: "#199e70", night: "#199e70" },
-  quarter: { day: "#d95926", night: "#d95926" },
+  half: { day: "#555095", night: "#8e87d2" },
+  third: { day: "#58994a", night: "#65a556" },
+  quarter: { day: "#a03e46", night: "#a03e46" },
 };
 function relationInk(rel: RelationDef, night: boolean): string {
   const h = RELATION_HUE[rel.key];
@@ -1214,18 +1220,12 @@ export function OrreryDial({
                   /* Solid, in a lighter blue than Earth's ring. With Earth hollow
                      and the two set apart, no knockout or pinhole is needed to
                      tell them apart any more. */
+                  /* Matte. Rock, not glass: a lit side and a shadowed limb, no
+                     rim bounce and no sheen, which is how the Moon looks to the
+                     eye and is not how a marble looks. */
                   <>
                     <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#sphere-${p.name}-${uid})`} />
                     <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#limb-${p.name}-${uid})`} />
-                    <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#bounce-${p.name}-${uid})`} />
-                    <ellipse
-                      cx={pt.x - 0.62}
-                      cy={pt.y - 0.75}
-                      rx={1.02}
-                      ry={0.68}
-                      transform={`rotate(-34 ${pt.x - 0.62} ${pt.y - 0.75})`}
-                      fill={`url(#spec-${uid})`}
-                    />
                   </>
                 )
               ) : night ? (
