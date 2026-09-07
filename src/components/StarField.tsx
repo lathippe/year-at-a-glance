@@ -15,7 +15,7 @@ function mulberry32(a: number) {
 }
 
 /**
- * The sky behind the page, not just inside the dial. The chart's own stars stop
+ * The sky behind the page, not just inside the dial. The dial's own stars stop
  * at its viewBox, so on a wide screen the whole left and right of the page was
  * empty black — the dial looked like a picture hung on a wall rather than a
  * thing floating in the middle of somewhere very large.

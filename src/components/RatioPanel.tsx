@@ -23,6 +23,12 @@ export function RatioPanel({
   return (
     <section aria-label="Simple ratios between orbital periods" className={`flex flex-col gap-1.5 ${className}`}>
       <div className="label">simple ratios</div>
+      {/* The one line of framing on the page. It says what the object shows and
+          stops; the vocabulary everywhere else does the rest. */}
+      <p className="text-[12px] leading-snug max-w-[17rem]" style={{ color: "var(--muted-strong)" }}>
+        Fractions of a circle between the planets today, and whole-number ratios
+        between their years. A configuration nobody arranged.
+      </p>
       <table className="text-[12px] tabular-nums border-separate" style={{ borderSpacing: "0 2px" }}>
         <tbody>
           {ratios.map((r) => {

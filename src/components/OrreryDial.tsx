@@ -81,8 +81,8 @@ function radiusFor(au: number, night = true): number {
   return Math.round(r * 1000) / 1000;
 }
 
-/** 0° Aries at three o'clock, longitude running counterclockwise — the way a
-    chart wheel turns, not the way SVG counts. */
+/** Longitude zero at three o'clock, running counterclockwise — the way the
+    bodies go round, not the way SVG counts. */
 function pointAt(lonDeg: number, r: number) {
   const a = (lonDeg * Math.PI) / 180;
   // Rounded, and not for tidiness. Math.sin and Math.cos are not required to be
@@ -639,7 +639,7 @@ export function OrreryDial({
           cursor: hover ? "pointer" : "default",
           // The dial keeps the gesture: a tap on a two-pixel planet must not be
           // read as the start of a page scroll. It does mean the page cannot be
-          // scrolled by dragging across the chart.
+          // scrolled by dragging across the dial.
           touchAction: "none",
         }}
         // Per-body enter/leave dropped events: the bodies are two pixels wide,

@@ -2,12 +2,11 @@ import type { Metadata } from "next";
 import { Inter, Roboto_Mono, Literata } from "next/font/google";
 import "./globals.css";
 
-// The dashboard is written in Russian, so every family must ship Cyrillic and
-// must request the subset — Next only downloads the subsets listed here, and
-// without "cyrillic" the whole interface silently fell back to system fonts.
-// Midday's own sans is Hedvig Letters Sans, which has no Cyrillic. refero's
-// substitute is Inter with the letter-spacing overridden — the widened tracking
-// is the theme's signature, not the typeface.
+// The page is English now, but the engine still names bodies in Russian and a
+// stray name reaching the screen should at least render: every family keeps
+// the Cyrillic subset. Midday's own sans is Hedvig Letters Sans, which has no
+// Cyrillic. refero's substitute is Inter with the letter-spacing overridden —
+// the widened tracking is the theme's signature, not the typeface.
 const sans = Inter({
   variable: "--font-sans-family",
   subsets: ["latin", "cyrillic"],
@@ -31,9 +30,9 @@ const literata = Literata({
 });
 
 export const metadata: Metadata = {
-  title: "Year at a Glance",
+  title: "Year at a Glance: simple ratios between the planets",
   description:
-    "A year of sky on one dial: real planetary angles and the aspects between them, January 2026 to spring 2027.",
+    "The planets where they really are, January 2026 to spring 2027, on one dial. Halves, thirds and quarters of a circle between them, and whole-number ratios between their orbital periods, in a configuration nobody arranged.",
 };
 
 export default function RootLayout({

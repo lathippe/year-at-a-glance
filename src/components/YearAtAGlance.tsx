@@ -13,7 +13,8 @@ const MONTH = 30.44 * DAY;
 const SPAN = Math.round(16 * MONTH);
 /** How far back the sky is drawn when the page opens, and how long it takes to
     catch up. Three weeks is enough for the Moon to swing right round and for
-    Mercury to cross a sign — a glance at how today was arrived at, not a tour. */
+    Mercury to cross thirty degrees — a glance at how today was arrived at, not
+    a tour. */
 const INTRO_DAYS = 22;
 const INTRO_MS = 3400;
 /** How hard the sky is pulled toward the chosen day while scrubbing. Small
@@ -141,14 +142,14 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
 
   /** Hand the sky back to the chase, wherever it has got to. Any input during a
       timed pass ends it: the reader has changed their mind, and finishing an
-      animation they have interrupted is the chart arguing with them. */
+      animation they have interrupted is the dial arguing with them. */
   const takeOver = useCallback(() => {
     tween.current = null;
     run();
   }, [run]);
 
   // The sky opens three weeks back and glides up to today, and then stops. A
-  // chart that keeps moving is a screen saver: you wait for it instead of
+  // dial that keeps moving is a screen saver: you wait for it instead of
   // reading it.
   useEffect(() => {
     glide(todayMs - INTRO_DAYS * DAY, todayMs, INTRO_MS);

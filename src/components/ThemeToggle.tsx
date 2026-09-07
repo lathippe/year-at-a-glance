@@ -24,9 +24,9 @@ export function ThemeToggle() {
     // Synchronous, inside the click. The palette flips the instant the attribute
     // is set, but anything listening through MutationObserver only hears about it
     // after the browser has already painted — so for a frame or two the page was
-    // in the new palette while the chart was still drawn for the old one. That
+    // in the new palette while the dial was still drawn for the old one. That
     // mismatched frame is the flash: a white square on a dark page, a dark disc
-    // on a light one. Dispatching here puts the chart's update in the same React
+    // on a light one. Dispatching here puts the dial's update in the same React
     // commit as the toggle, so there is nothing to catch.
     window.dispatchEvent(new Event("themechange"));
     localStorage.setItem("theme", next);
@@ -41,12 +41,12 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      aria-label="Switch between the day and night charts"
+      aria-label="Switch between the day and night skies"
       // Names neither palette. The server cannot know which one the browser will
       // stamp on, so a title that says "switch to day" is a hydration mismatch on
       // half the loads — and a tooltip that reads as a verb answers the same
       // question anyway.
-      title="Switch between the night and day chart"
+      title="Switch between the night and day sky"
       className="flex items-center gap-2 rounded-full border border-[color:var(--border)] hover:border-[color:var(--border-strong)] transition-colors text-[color:var(--muted-strong)] px-3 h-8 cursor-pointer"
     >
       <span style={{ fontSize: 14 }} aria-hidden>
