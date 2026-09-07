@@ -1220,11 +1220,12 @@ export function OrreryDial({
                   /* Solid, in a lighter blue than Earth's ring. With Earth hollow
                      and the two set apart, no knockout or pinhole is needed to
                      tell them apart any more. */
-                  /* Matte. Rock, not glass: a lit side and a shadowed limb, no
-                     rim bounce and no sheen, which is how the Moon looks to the
-                     eye and is not how a marble looks. */
+                  /* Matte. Rock, not glass: a flat disc of its own grey with
+                     one shadow along the far limb, no lit spot, no rim bounce,
+                     no sheen. That is how the Moon looks to the eye and is not
+                     how a marble looks. */
                   <>
-                    <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#sphere-${p.name}-${uid})`} />
+                    <circle cx={pt.x} cy={pt.y} r={2.4} fill={toneHex(p.name, night)} />
                     <circle cx={pt.x} cy={pt.y} r={2.4} fill={`url(#limb-${p.name}-${uid})`} />
                   </>
                 )
@@ -1280,6 +1281,21 @@ export function OrreryDial({
                     filter={`url(#${lifted ? "lift" : "body"}-glow-${uid})`}
                     opacity={lifted ? 0.7 : isHover ? 0.42 : 0.26}
                   />
+                  {/* Saturn's ring in two halves. The far half goes down here,
+                      under the disc, so only its tips show past the limb; the
+                      near half is drawn over the disc after the shading. Seen
+                      a little from above, which is what tilts the ring. */}
+                  {p.name === "Saturn" && (
+                    <g transform={`translate(${pt.x} ${pt.y}) rotate(-16)`}>
+                      <path
+                        d="M -6.4 0 A 6.4 1.6 0 0 1 6.4 0"
+                        fill="none"
+                        stroke={rimFor(toneHex(p.name, night))}
+                        strokeWidth={0.75}
+                        opacity={isHover ? 0.95 : 0.8}
+                      />
+                    </g>
+                  )}
                   {/* Lit, banded if it has bands, bounce on the far rim, sheen
                       over the top. The edge is where the shading runs out. */}
                   <circle
@@ -1318,22 +1334,17 @@ export function OrreryDial({
                     transform={`rotate(-30 ${pt.x - (p.isEarth ? 0.85 : 1)} ${pt.y - (p.isEarth ? 1 : 1.15)})`}
                     fill={`url(#spec-${uid})`}
                   />
-                  {/* The one planet whose shape is recognisable at four pixels.
-                      Drawn across the disc rather than behind it: that is how a
-                      model of Saturn is read at this size, and hiding half of it
-                      for accuracy would only cost the recognition. */}
+                  {/* The near half of Saturn's ring, in front of the disc. */}
                   {p.name === "Saturn" && (
-                    <ellipse
-                      cx={pt.x}
-                      cy={pt.y}
-                      rx={6.4}
-                      ry={1.6}
-                      transform={`rotate(-16 ${pt.x} ${pt.y})`}
-                      fill="none"
-                      stroke={rimFor(toneHex(p.name, night))}
-                      strokeWidth={0.75}
-                      opacity={isHover ? 0.95 : 0.8}
-                    />
+                    <g transform={`translate(${pt.x} ${pt.y}) rotate(-16)`}>
+                      <path
+                        d="M -6.4 0 A 6.4 1.6 0 0 0 6.4 0"
+                        fill="none"
+                        stroke={rimFor(toneHex(p.name, night))}
+                        strokeWidth={0.75}
+                        opacity={isHover ? 0.95 : 0.8}
+                      />
+                    </g>
                   )}
 
                 </>
