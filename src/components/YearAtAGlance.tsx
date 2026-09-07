@@ -362,8 +362,6 @@ export function YearAtAGlance() {
             <OrreryDial
               planets={planets}
               maxWidth={1400}
-              aspectMode="chord"
-              personal={false}
               wheelScrub={false}
             />
           </div>

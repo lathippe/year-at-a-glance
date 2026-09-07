@@ -1,25 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { HelioPos } from "@/lib/helio";
-import { helioPositions } from "@/lib/helio";
 import { useIsDark } from "@/lib/useIsDark";
 import { useSelectedDate } from "@/lib/selectedDate";
 import { blendHex, mixHex, planetTone, rimFor } from "@/lib/planetTones";
-import {
-  aspectTone,
-  ASPECT_TONE_COLOR,
-  readSkyAspect,
-  NATAL,
-  NATAL_CUSPS,
-  computePositions,
-  computeTransits,
-  houseOfLongitude,
-  toRoman,
-  HOUSE_MEANING_RU,
-  ZODIAC_GLYPHS,
-} from "@/lib/astrology";
+
+/** The twelve signs on the rim, in order from 0°. */
+const ZODIAC_GLYPHS = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"] as const;
+
+/** Tone of an aspect: sextile and trine flow, square and opposition grind,
+    conjunction stays neutral because its character depends on the bodies. */
+type AspectTone = "positive" | "negative" | "neutral";
+function aspectTone(name: string): AspectTone {
+  if (name === "sextile" || name === "trine") return "positive";
+  if (name === "square" || name === "opposition") return "negative";
+  return "neutral";
+}
+const ASPECT_TONE_COLOR: Record<AspectTone, string> = {
+  positive: "#4db8b0",
+  negative: "var(--aspect-negative)",
+  neutral: "#8b7fa8",
+};
 
 const SIZE = 460;
 const C = SIZE / 2;
@@ -160,50 +163,17 @@ const ASPECTS = [
 ] as const;
 const ASPECT_ORB = 6;
 
-/** Where an aspect is drawn. "chord" joins the two bodies where they stand;
-    "ring" joins their marks on a rim scaled in geocentric longitude, where the
-    angle on screen really is the aspect angle. */
-export type AspectMode = "chord" | "ring";
+/** Radius of the rim the sign glyphs sit inside. */
 const R_RING = 224;
 
-/**
- * The two rings are different kinds of thing and now say so. The zodiac is the
- * sky's own fixed grid, cool and impersonal; the houses are hers, warm. Both
- * stay muted: neither may compete with the planet tints, which carry meaning.
- */
 /** Tension. Red rather than the burnt orange picked first for colour-blindness:
     on a black sky that orange read as gold, which is the colour of something
     good. Red scores better on both counts at once — against the turquoise of
     harmony 15.1 → 19.8 under deuteranopia, against the Sun's gold 15.1 → 26.4. */
 const TENSION_INK = { day: "#b8392b", night: "#d24a3a" };
 
+/** Muted on purpose: the rim may not compete with the planet tints. */
 const ZODIAC_INK = { day: "#6f7b88", night: "#8b95a3" };
-const HOUSE_INK = { day: "#8a7757", night: "#9c8f78" };
-
-/** An aspect on the rim, drawn as the arc of rim it actually spans. The arc's
-    own length is the angle: a trine covers a third of the circle, a square a
-    quarter, and it can be read off without a label. Always the short way round,
-    since an aspect is never wider than 180°. */
-function rimArc(lonA: number, lonB: number, r: number) {
-  const delta = ((lonB - lonA + 540) % 360) - 180; // -180..180
-  const a = pointAt(lonA, r);
-  const b = pointAt(lonB, r);
-  // Longitude grows counterclockwise on screen, which is SVG's negative sweep.
-  const sweep = delta > 0 ? 0 : 1;
-  const steps = 24;
-  const samples = Array.from({ length: steps + 1 }, (_, i) =>
-    pointAt(lonA + (delta * i) / steps, r)
-  );
-  return { d: `M${a.x} ${a.y} A${r} ${r} 0 0 ${sweep} ${b.x} ${b.y}`, samples, span: Math.abs(delta) };
-}
-
-function distToPolyline(px: number, py: number, pts: { x: number; y: number }[]): number {
-  let best = Infinity;
-  for (let i = 0; i < pts.length - 1; i++) {
-    best = Math.min(best, distToSegment(px, py, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y));
-  }
-  return best;
-}
 
 const MOON_OFFSET = 8.2;
 
@@ -246,14 +216,6 @@ function bodyInk(p: HelioPos, night: boolean): string {
   return p.tone;
 }
 
-/** Her natal chart, geocentric longitudes. Fixed data, so it is built once at
-    module load rather than on every render. */
-const NATAL_BODIES = computePositions(NATAL.date).map((p) => ({
-  nameRu: p.body.nameRu,
-  glyph: p.body.glyph,
-  lon: p.longitude,
-}));
-
 type AspectHit = { symbol: string; tone: string; label: string; strength: number };
 
 /** How much an aspect is worth saying out loud. Hard angles outrank soft ones,
@@ -271,13 +233,12 @@ function strengthOf(name: string, orb: number): number {
   return (ASPECT_WEIGHT[name] ?? 0.7) * (1 - orb / ASPECT_ORB);
 }
 
-/** Everything a body is in aspect to, split into what is happening in the sky
-    and what is landing on her chart. Weak ones are dropped rather than listed:
-    a six-degree sextile is noise. */
+/** Everything a body is in aspect to in the sky. Weak ones are dropped rather
+    than listed: a six-degree sextile is noise. */
 function aspectsOf(
   p: HelioPos,
   sky: { a: HelioPos; b: HelioPos; name: string; symbol: string; tone: string; orb: number }[]
-): { inSky: AspectHit[]; toNatal: AspectHit[] } {
+): AspectHit[] {
   const inSky: AspectHit[] = [];
   for (const asp of sky) {
     const other =
@@ -290,26 +251,10 @@ function aspectsOf(
       strength: strengthOf(asp.name, asp.orb),
     });
   }
-  const toNatal: AspectHit[] = [];
-  if (p.geoLon != null) {
-    for (const n of NATAL_BODIES) {
-      const d = angularDiff(p.geoLon, n.lon);
-      for (const asp of ASPECTS) {
-        const orb = Math.abs(d - asp.angle);
-        if (orb <= ASPECT_ORB) {
-          toNatal.push({
-            symbol: asp.symbol,
-            tone: ASPECT_TONE_COLOR[aspectTone(asp.name)],
-            label: n.nameRu,
-            strength: strengthOf(asp.name, orb),
-          });
-        }
-      }
-    }
-  }
-  const trim = (xs: AspectHit[]) =>
-    xs.filter((x) => x.strength >= MIN_STRENGTH).sort((a, b) => b.strength - a.strength).slice(0, 5);
-  return { inSky: trim(inSky), toNatal: trim(toNatal) };
+  return inSky
+    .filter((x) => x.strength >= MIN_STRENGTH)
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, 5);
 }
 
 /** Distance from a point to a segment. The aspect chords carry no marker any
@@ -473,8 +418,8 @@ const SIGNS = ["Овен", "Телец", "Близнецы", "Рак", "Лев",
     change palette when the dashboard theme flips. */
 export type OrreryVariant = "night" | "day" | "auto";
 
-/** Built from the one palette in lib/planetTones, so the dial, the natal wheel
-    and the ribbon cannot drift apart. Earth is the exception: on the dial it
+/** Built from the one palette in lib/planetTones, so nothing showing a planet
+    can drift from the dial. Earth is the exception: on the dial it
     wears the accent, because it is where you are standing. */
 const toneVars = (night: boolean): CSSProperties =>
   ({
@@ -492,8 +437,6 @@ export function OrreryDial({
   planets,
   maxWidth = SIZE,
   variant = "auto",
-  aspectMode = "chord",
-  personal = true,
   wheelScrub = true,
 }: {
   planets: HelioPos[];
@@ -501,14 +444,6 @@ export function OrreryDial({
   maxWidth?: number;
   /** "auto" follows the dashboard theme; the two named skies pin it. */
   variant?: OrreryVariant;
-  aspectMode?: AspectMode;
-  /**
-   * With nobody attached the dial is a universal chart of the real sky: the
-   * houses, the birth marks and every mention of a natal contact are gone, and
-   * what is left is the planets and the angles they make with each other today.
-   * The public showcase runs this way and ships no birth data at all.
-   */
-  personal?: boolean;
   /** Off when the page owns the wheel itself, so the gesture works beside the
       dial as well as over it and nothing counts a scroll twice. */
   wheelScrub?: boolean;
@@ -522,10 +457,6 @@ export function OrreryDial({
   // Off until asked for, on every chart. The dial should first read as the sky;
   // the aspects are a second layer over it and the Sun is the switch.
   const [aspectsVisible, setAspectsVisible] = useState(false);
-  // Hoisted out of the layer below: the pointer handler needs the same list.
-  // The sky at birth, computed once: it never changes, and it is the reference
-  // the moving dial is read against.
-  const natalPlanets = useMemo(() => helioPositions(NATAL.date), []);
 
   // The Sun has no place in a heliocentric list — it is the middle — so it was
   // missing from the aspect web entirely, and its aspects are among the ones
@@ -568,9 +499,6 @@ export function OrreryDial({
   // geocentric rim.
   const aspectEnds = (asp: { a: HelioPos; b: HelioPos }) =>
     [dialPoint(asp.a, earthPos, night), dialPoint(asp.b, earthPos, night)] as const;
-  // Two arcs on the very same radius would sit on top of each other where their
-  // spans overlap, so they alternate between two rings three pixels apart.
-  const arcRadius = (i: number) => R_RING - 5 - (i % 2) * 3.5;
 
   // Two dials can share a page, and SVG ids are global to the document.
   const uid = variant === "auto" ? (night ? "auto-night" : "auto-day") : variant;
@@ -586,7 +514,7 @@ export function OrreryDial({
       ? pinned
       : null;
   const hoveredBody =
-    hover && !hover.startsWith("asp:") && !hover.startsWith("natal:") ? hover : null;
+    hover && !hover.startsWith("asp:") ? hover : null;
   const aspects = aspectsVisible
     ? pinnedPlanet
       ? skyAspects.filter((a) => a.a.nameRu === pinnedPlanet || a.b.nameRu === pinnedPlanet)
@@ -598,29 +526,23 @@ export function OrreryDial({
     ? skyAspects.filter((a) => a.a.nameRu === hoveredBody || a.b.nameRu === hoveredBody)
     : [];
 
-  const [houseHover, setHouseHover] = useState<number | null>(null);
   const [signHover, setSignHover] = useState<number | null>(null);
 
   // Scrolling over the dial walks the calendar, a day at a time, unless a body
   // is being read: then the wheel belongs to the page again. State is mirrored
   // into refs so the listener is attached once instead of on every pointer move.
   const { selected, setSelected } = useSelectedDate();
-  const wheelState = useRef({ hover, pinned, selected });
+  const wheelState = useRef({ selected });
   useEffect(() => {
-    wheelState.current = { hover, pinned, selected };
-  }, [hover, pinned, selected]);
+    wheelState.current = { selected };
+  }, [selected]);
   useEffect(() => {
     const el = svgRef.current;
     if (!el || !wheelScrub) return;
     let acc = 0;
     const STEP = 36; // wheel pixels per day
     const onWheel = (e: WheelEvent) => {
-      const { hover: h, pinned: p, selected: day } = wheelState.current;
-      // On a personal chart the wheel goes back to the page while something is
-      // being read, so a card can be scrolled past. The universal chart is a
-      // cover: scrolling it is the only way through the year, and handing the
-      // wheel back moves the whole screen out from under the reader instead.
-      if (personal && (h || p)) return;
+      const { selected: day } = wheelState.current;
       e.preventDefault();
       acc += e.deltaY;
       const days = Math.trunc(acc / STEP);
@@ -630,7 +552,7 @@ export function OrreryDial({
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [setSelected, personal, wheelScrub]);
+  }, [setSelected, wheelScrub]);
   // Hover reads, click keeps. Nothing on the dial is labelled, so the card is
   // the only name: it has to survive the pointer leaving.
   // Two different jobs. `shown` drives the lit state on the dial and survives a
@@ -659,7 +581,7 @@ export function OrreryDial({
     // Twenty, not seven: the line is bowed away from the chord it is scored
     // against, so on a narrow reach you aim at the visible arc and miss the
     // invisible straight line underneath.
-    const chordReach = aspectMode === "ring" ? (touch ? 14 : 7) : touch ? 30 : 20;
+    const chordReach = touch ? 30 : 20;
     let best: string | null = null;
     let bestScore = 1;
     for (const p of planets) {
@@ -672,28 +594,6 @@ export function OrreryDial({
         best = p.nameRu;
       }
     }
-    // Natal marks are small and sit on top of nothing, so they get their own
-    // pass with a tighter reach than a live planet: they must never win a
-    // contest against the body they are the memory of.
-    for (const n of personal ? natalPlanets : []) {
-      const liveBody = planets.find((q) => q.name === n.name);
-      if (!liveBody || liveBody.isEarth || liveBody.isMoon) continue;
-      const at = pointAt(n.lon, radiusFor(liveBody.au, night));
-      const d = Math.hypot(at.x - x, at.y - y);
-      // Right on top of the mark it wins outright. A live planet's reach is
-      // nearly twice as wide, so on score alone a body fifteen pixels away beat
-      // a ghost the pointer was sitting on, and the mark felt dead.
-      if (d < (touch ? 14 : 7)) {
-        bestScore = -1;
-        best = `natal:${n.name}`;
-        continue;
-      }
-      const score = d / (touch ? 30 : 16);
-      if (score < bestScore) {
-        bestScore = score;
-        best = `natal:${n.name}`;
-      }
-    }
     // The Sun sits at the centre and is hovered like any other body, but it has
     // no card: it is the one thing on the dial that never needed naming.
     const dSun = Math.hypot(C - x, C - y);
@@ -704,14 +604,8 @@ export function OrreryDial({
     }
     aspects.forEach((asp, i) => {
       if (!drawn(asp)) return;
-      let score: number;
-      if (aspectMode === "ring") {
-        const arc = rimArc(asp.a.geoLon!, asp.b.geoLon!, arcRadius(i));
-        score = distToPolyline(x, y, arc.samples) / chordReach;
-      } else {
-        const [pa, pb] = aspectEnds(asp);
-        score = distToSegment(x, y, pa.x, pa.y, pb.x, pb.y) / chordReach;
-      }
+      const [pa, pb] = aspectEnds(asp);
+      const score = distToSegment(x, y, pa.x, pa.y, pb.x, pb.y) / chordReach;
       if (score < bestScore) {
         bestScore = score;
         best = `asp:${i}`;
@@ -721,18 +615,7 @@ export function OrreryDial({
   };
 
   const shown = hover ?? pinned;
-  const natalHot = shown?.startsWith("natal:") ? shown.slice(6) : null;
   const cardKey = touchMode ? shown : hover;
-  const natalCard = cardKey?.startsWith("natal:") ? cardKey.slice(6) : null;
-  // What today's sky is doing to that one natal point. Geocentric, like every
-  // other aspect on the board: the dot's place on the dial is heliocentric, but
-  // an aspect is an angle seen from Earth, and mixing the two would be a lie
-  // dressed as a line. So nothing is drawn between them — the card says it.
-  // Natal contacts are a personal reading; the universal chart has none.
-  const natalHits =
-    personal && natalCard
-      ? computeTransits(selected).filter((t) => t.natal.body.name === natalCard)
-      : [];
 
 
   const active = planets.find((p) => p.nameRu === cardKey) ?? null;
@@ -771,7 +654,7 @@ export function OrreryDial({
           setTouchMode(true);
           const hit = pickAt(e);
           setHover(hit);
-          if (hit && !hit.startsWith("asp:") && !hit.startsWith("natal:"))
+          if (hit && !hit.startsWith("asp:"))
             setAspectsVisible(true);
           else if (!hit) setAspectsVisible(false);
           setPinned((s) => (hit ? (s === hit ? null : hit) : null));
@@ -788,7 +671,7 @@ export function OrreryDial({
           // with a reading, and it used to leave every thread on screen with
           // nothing selected. The Sun stops propagation, so its own switch is
           // not caught by this.
-          if (hover && !hover.startsWith("asp:") && !hover.startsWith("natal:"))
+          if (hover && !hover.startsWith("asp:"))
             setAspectsVisible(true);
           else if (!hover) setAspectsVisible(false);
           setPinned((s) => (hover ? (s === hover ? null : hover) : null));
@@ -1040,14 +923,11 @@ export function OrreryDial({
             fill="none"
             stroke={p.tone}
             strokeWidth={0.7}
-            // One lit state, whatever asked for it: pointing at the body, at the
-            // house it stands in, or at its sign all bring the orbit forward the
-            // same amount. The separation comes from the others stepping back.
+            // One lit state, whatever asked for it: pointing at the body or at
+            // its sign brings the orbit forward the same amount. The separation
+            // comes from the others stepping back.
             opacity={
               (shown === p.nameRu ||
-              (houseHover != null &&
-                p.geoLon != null &&
-                houseOfLongitude(p.geoLon) === houseHover) ||
               (signHover != null && p.signIdx === signHover)
                 ? night
                   ? 0.3
@@ -1060,14 +940,8 @@ export function OrreryDial({
           />
           ))}
 
-        {/* Astrological sightlines, paper sky only. Thin grey lines from Earth
-            to every planet; where two planets stand at a major angle from
-            Earth, both their lines take that aspect's colour and a dashed chord
-            with its symbol joins the pair. The angle drawn at Earth is not the
-            aspect angle — radii on this dial are logarithmic — so the relation
-            is named by colour and glyph instead of faked as geometry. */}
-        {/* The twelve signs, on their own band inside the house numerals. Same
-            deal as the houses: hovering one lights whoever is standing in it. */}
+        {/* The twelve signs, on their own band at the rim. Hovering one lights
+            whoever is standing in it. */}
         <g>
           {ZODIAC_GLYPHS.map((glyph, i) => {
             const mid = pointAt(i * 30 + 15, R_RING - 22);
@@ -1118,67 +992,6 @@ export function OrreryDial({
             );
           })}
         </g>
-
-        {/* Her Placidus houses, in both skies. No ring is drawn for them: the
-            numerals alone mark the twelve sectors, and hovering one fills its
-            wedge back to Earth, the point the houses are measured from. */}
-        {personal && (
-          <g>
-{NATAL_CUSPS.map((cusp, hi) => {
-                    const next = NATAL_CUSPS[(hi + 1) % 12];
-                    const span = (((next - cusp) % 360) + 360) % 360;
-                    const label = pointAt(cusp + span / 2, R_RING - 4);
-                    const house = hi + 1;
-                    const hot = houseHover === house;
-                    const busy = planets.some(
-                      (p) =>
-                        !p.isEarth &&
-                        p.geoLon != null &&
-                        houseOfLongitude(p.geoLon) === house
-                    );
-                    return (
-                      <g key={`house-${hi}`}>
-                        {/* No wedge any more. The sector fill was the loudest
-                            mark for the least information; the bodies standing in
-                            the house say it better by lighting up. */}
-                        <circle
-                          cx={label.x}
-                          cy={label.y}
-                          r={11}
-                          fill="transparent"
-                          style={{ cursor: "pointer" }}
-                          onMouseEnter={() => setHouseHover(house)}
-                          onMouseLeave={() =>
-                            setHouseHover((v) => (v === house ? null : v))
-                          }
-                        />
-                        {hot && (
-                          <circle
-                            cx={label.x}
-                            cy={label.y}
-                            r={10}
-                            fill="var(--foreground)"
-                            opacity={night ? 0.12 : 0.07}
-                            pointerEvents="none"
-                          />
-                        )}
-                        <text
-                          x={label.x}
-                          y={label.y}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          fill={hot ? "var(--foreground)" : night ? HOUSE_INK.night : HOUSE_INK.day}
-                          opacity={hot ? 1 : busy ? (night ? 0.7 : 0.8) : night ? 0.2 : 0.28}
-                          pointerEvents="none"
-                          style={{ fontSize: 11, letterSpacing: "0.04em", fontWeight: hot ? 600 : 400 }}
-                        >
-                          {toRoman(house)}
-                        </text>
-                      </g>
-                    );
-                  })}
-                          </g>
-        )}
 
         {(() => {
             const earth = planets.find((p) => p.isEarth);
@@ -1372,141 +1185,23 @@ export function OrreryDial({
             <title>{aspectsVisible ? "Hide aspects" : "Show aspects"}</title>
           </circle>
 
-        {/* Where each planet stood at birth, as a small dot on its own orbit,
-            in that planet's own colour. An outlined ring read as an object of
-            its own; a dot in the orbit's colour reads as a place on it.
-            Drawn before the trails and the bodies so it never competes with
-            where a planet is now: it is a reference mark, not a reading.
-
-            The ring sits on the same radius as the live body rather than at the
-            distance the planet actually had that day. The dial's radii are
-            already schematic — logarithmic, so the inner planets do not collapse
-            into the Sun — and a ghost floating a few pixels off its own orbit
-            would read as a drawing error rather than as an ellipse. The angle,
-            which is the part that carries meaning, is exact. */}
-        {/* Dashed threads from today's planets to the natal mark under the
-            pointer. Dashed on purpose, and the same dash the natal wheel uses
-            for a transit: it says "this touches that", which is true. What it
-            deliberately does not say is the angle — the mark sits at the
-            planet's heliocentric place and the aspect is measured from Earth, so
-            the line is a connector, not a measurement. The card carries the real
-            aspect and orb. Drawn before the ghosts and the bodies. */}
-        {natalCard &&
-          natalHits.map((t, i) => {
-            const n = natalPlanets.find((x) => x.name === natalCard);
-            const liveOfNatal = planets.find((x) => x.name === natalCard);
-            const from = planets.find((x) => x.name === t.transit.body.name);
-            if (!n || !liveOfNatal || !from) return null;
-            const a = dialPoint(from, earthPos, night);
-            const b = pointAt(n.lon, radiusFor(liveOfNatal.au, night));
-            return (
-              <line
-                key={`nt-${i}`}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={ASPECT_TONE_COLOR[aspectTone(t.aspect.name)]}
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                opacity={night ? 0.75 : 0.7}
-                pointerEvents="none"
-              />
-            );
-          })}
-
-        {/* Names on the far end of each thread. A dashed line to an unlabelled
-            dot makes you trace it back to find out what it reached; the whole
-            point of the hover is to answer that without moving your eye twice. */}
-        {natalCard &&
-          natalHits.map((t, i) => {
-            const from = planets.find((x) => x.name === t.transit.body.name);
-            if (!from) return null;
-            const at = dialPoint(from, earthPos, night);
-            // Outward by default, flipped if the name would run past the edge of
-            // the viewBox — an svg clips at its box, and a body on the outermost
-            // orbit has barely thirty pixels of room. Width is estimated from the
-            // character count: measuring text would mean a layout pass per frame.
-            const w = t.transit.body.nameRu.length * 6.6;
-            let right = at.x >= C;
-            if (right && at.x + 11 + w > SIZE - 4) right = false;
-            if (!right && at.x - 11 - w < 4) right = true;
-            return (
-              <text
-                key={`ntl-${i}`}
-                x={at.x + (right ? 11 : -11)}
-                y={at.y + 4}
-                textAnchor={right ? "start" : "end"}
-                fill={night ? "#ffffff" : "var(--foreground)"}
-                pointerEvents="none"
-                style={{ fontSize: 12, fontWeight: 500 }}
-              >
-                {t.transit.body.nameRu}
-              </text>
-            );
-          })}
-
-        {personal && natalPlanets.map((n) => {
-          const live = planets.find((p) => p.nameRu === n.nameRu);
-          if (!live || live.isEarth || live.isMoon) return null;
-          const at = pointAt(n.lon, radiusFor(live.au, night));
-          return (
-            <circle
-              key={`natal-${n.nameRu}`}
-              cx={at.x}
-              cy={at.y}
-              r={2}
-              // Grey and rimless. In the planet's own colour the mark competed
-              // with the planet itself; a ghost should read as absence of the
-              // live thing, not as a second copy of it.
-              fill="var(--muted)"
-              opacity={
-                natalHot === n.name ? (night ? 0.95 : 0.9) : night ? 0.38 : 0.34
-              }
-              style={{ transition: "opacity 120ms" }}
-              pointerEvents="none"
-            />
-          );
-        })}
-
         {planets.map((p, gi) => {
           const r = radiusFor(p.au, night);
           const pt = dialPoint(p, earthPos, night);
-          // A body lights up when the pointer is on it, or on the house it is
+          // A body lights up when the pointer is on it, or on the sign it is
           // standing in right now.
-          const inLitHouse =
-            !p.isEarth &&
-            ((houseHover != null &&
-              p.geoLon != null &&
-              houseOfLongitude(p.geoLon) === houseHover) ||
-              (signHover != null && p.geoLon != null && p.signIdx === signHover));
-          const isHover = shown === p.nameRu || inLitHouse;
+          const inLitSign =
+            !p.isEarth && signHover != null && p.geoLon != null && p.signIdx === signHover;
+          const isHover = shown === p.nameRu || inLitSign;
           // Hovering a sign that actually holds something pushes everyone else
           // back, so the group in it reads as a group. An empty sign changes
-          // nothing: there would be nothing to compare against.
-          const inHouse = (x: HelioPos) =>
-            !x.isEarth && x.geoLon != null && houseOfLongitude(x.geoLon) === houseHover;
+          // nothing: there would be nothing to compare against. Earth has no
+          // geocentric sign: it is the vantage point, so it steps back with the
+          // rest whenever a sector is being pointed at.
           const signHolds =
             signHover != null &&
             planets.some((x) => !x.isEarth && x.geoLon != null && x.signIdx === signHover);
-          const houseHolds = houseHover != null && planets.some(inHouse);
-          // Earth has no house and no geocentric sign: it is the vantage point,
-          // so it is never one of the bodies in the sector being pointed at.
-          // Holding it at full strength while everything else fell back read as
-          // "Earth is in this house", and the card below it said otherwise. It
-          // steps back with the rest now.
-          // A pinned natal mark asks one question — what is touching this point
-          // — so the bodies that answer it stay lit and the rest step back. No
-          // line is drawn to them: the mark's place on the dial is heliocentric
-          // and the aspect is geocentric, and a chord between the two would
-          // state an angle that is not the aspect's.
-          const touchesNatal =
-            natalHits.some((t) => t.transit.body.name === p.name);
-          const dimmed = p.isEarth
-            ? signHolds || houseHolds || natalHits.length > 0
-            : (signHolds && p.signIdx !== signHover) ||
-              (houseHolds && !inHouse(p)) ||
-              (natalHits.length > 0 && !touchesNatal);
+          const dimmed = p.isEarth ? signHolds : signHolds && p.signIdx !== signHover;
           const deg = trailDegrees(p.degPerDay, night);
           const tailStart = pointAt(p.lon - deg, r);
           const gid = `trail-grad-${uid}-${gi}`;
@@ -1554,7 +1249,7 @@ export function OrreryDial({
                   a filled dark dot reads as a hole punched in the page, so the
                   body is hollow instead — a ring around the page's own white,
                   which reads as a small luminary rather than a blot. */}
-              {p.isMoon && inLitHouse && (
+              {p.isMoon && inLitSign && (
                 <circle
                   cx={pt.x}
                   cy={pt.y}
@@ -1600,10 +1295,10 @@ export function OrreryDial({
                 )
               ) : night ? (
                 <>
-                  {/* Standing in the house under the pointer: the same gold lift
-                      the paper sky gives, so the answer to "who is in this house"
+                  {/* Standing in the sector under the pointer: the same gold lift
+                      the paper sky gives, so the answer to "who is in this sector"
                       looks the same in both. */}
-                  {inLitHouse && (
+                  {inLitSign && (
                     <circle
                       cx={pt.x}
                       cy={pt.y}
@@ -1643,12 +1338,12 @@ export function OrreryDial({
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={inLitHouse ? (p.isEarth ? 6.4 : 6.8) : p.isEarth ? 3.7 : 4.1}
+                    r={inLitSign ? (p.isEarth ? 6.4 : 6.8) : p.isEarth ? 3.7 : 4.1}
                     // The lift is the body's own colour, only stronger. Gold said
                     // "selected" in a language nothing else on the dial speaks.
                     fill={p.tone}
-                    filter={`url(#${inLitHouse ? "lift" : "body"}-glow-${uid})`}
-                    opacity={inLitHouse ? 0.7 : isHover ? 0.42 : 0.26}
+                    filter={`url(#${inLitSign ? "lift" : "body"}-glow-${uid})`}
+                    opacity={inLitSign ? 0.7 : isHover ? 0.42 : 0.26}
                   />
                   {/* Lit, banded if it has bands, bounce on the far rim, sheen
                       over the top. The edge is where the shading runs out. */}
@@ -1766,142 +1461,6 @@ export function OrreryDial({
         );
       })()}
 
-      {personal && houseHover !== null && (() => {
-        const cusp = NATAL_CUSPS[houseHover - 1];
-        const next = NATAL_CUSPS[houseHover % 12];
-        const span = (((next - cusp) % 360) + 360) % 360;
-        const at = pointAt(cusp + span / 2, R_RING - 4);
-        const inside = planets.filter(
-          (p) => !p.isEarth && p.geoLon != null && houseOfLongitude(p.geoLon) === houseHover
-        );
-        return (
-          <div
-            className="absolute z-20 pointer-events-none rounded-md px-2.5 py-1.5"
-            // Back at the numeral it belongs to. Under the dial it was accurate
-            // and useless: you had to hunt for it. The lit orbits keep the answer
-            // readable even where the card covers the ring.
-            style={{
-              left: `${(at.x / SIZE) * 100}%`,
-              top: `${(at.y / SIZE) * 100}%`,
-              transform: "translate(-50%, -115%)",
-              background: night ? "rgba(8, 10, 16, 0.94)" : "var(--surface)",
-              border: night ? "1px solid rgba(255,255,255,0.16)" : "1px solid var(--border-strong)",
-              minWidth: 190,
-              maxWidth: 320,
-            }}
-          >
-            <div
-              className="text-sm font-medium"
-              style={{ color: night ? "#ffffff" : "var(--foreground)" }}
-            >
-              House {toRoman(houseHover)}
-            </div>
-            <div
-              className="text-[11px]"
-              style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}
-            >
-              {HOUSE_MEANING_RU[houseHover] ?? ""}
-            </div>
-            {/* An empty house says so by having nothing under its name. Writing
-                it out made the card taller for less. */}
-            {inside.length > 0 && (
-              <div className="mt-1.5 flex flex-col gap-0.5">
-                {inside.map((p) => (
-                  <div key={p.nameRu} className="text-[11px] flex items-baseline gap-1.5">
-                    <span style={{ color: p.tone }}>{p.glyph}</span>
-                    <span style={{ color: night ? "rgba(255,255,255,0.9)" : "var(--foreground)" }}>
-                      {en(p.nameRu)}
-                    </span>
-                    <span
-                      className="tabular-nums"
-                      style={{ color: night ? "rgba(255,255,255,0.5)" : "var(--muted)" }}
-                    >
-                      {ZODIAC_GLYPHS[Math.floor((p.geoLon ?? 0) / 30)]}{" "}
-                      {Math.floor((p.geoLon ?? 0) % 30)}°
-                    </span>
-                    <span
-                      className="ml-auto"
-                      style={{ color: night ? "rgba(255,255,255,0.5)" : "var(--muted)" }}
-                    >
-                      {ROLE_EN[p.name] ?? ""}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* The natal mark's own card. Hovering says only which point it is —
-          a mark this small needs a name before it needs a reading. Pinning it
-          adds what today's sky is doing to that point. */}
-      {natalCard && (() => {
-        const n = natalPlanets.find((x) => x.name === natalCard);
-        const live = planets.find((x) => x.name === natalCard);
-        if (!n || !live) return null;
-        const at = pointAt(n.lon, radiusFor(live.au, night));
-        const open = pinned === `natal:${natalCard}`;
-        return (
-          <div
-            className="absolute pointer-events-none rounded-md px-2.5 py-1.5"
-            style={{
-              left: `${(at.x / SIZE) * 100}%`,
-              top: `${(at.y / SIZE) * 100}%`,
-              transform: "translate(-50%, -125%)",
-              background: night ? "rgba(8, 10, 16, 0.92)" : "var(--surface)",
-              border: night
-                ? "1px solid rgba(255, 255, 255, 0.16)"
-                : "1px solid var(--border-strong)",
-              whiteSpace: open ? "normal" : "nowrap",
-              width: open ? 240 : undefined,
-            }}
-          >
-            <div
-              className="text-sm font-medium flex items-baseline gap-1.5"
-              style={{ color: night ? "#ffffff" : "var(--foreground)" }}
-            >
-              <span style={{ color: "var(--muted)" }}>{n.glyph}</span>
-              {n.nameRu} нат.
-            </div>
-            {open && (
-              <div className="mt-1.5 flex flex-col gap-0.5">
-                {natalHits.length === 0 ? (
-                  <span
-                    className="text-[11px]"
-                    style={{ color: night ? "rgba(255,255,255,0.55)" : "var(--muted)" }}
-                  >
-                    сегодня к этой точке ничего не идёт
-                  </span>
-                ) : (
-                  natalHits.map((t, i) => (
-                    <div key={i} className="text-[11px] flex items-baseline gap-1.5">
-                      <span style={{ color: planetTone(t.transit.body.name, night) }}>
-                        {t.transit.body.glyph}
-                      </span>
-                      <span
-                        style={{ color: night ? "rgba(255,255,255,0.9)" : "var(--foreground)" }}
-                      >
-                        {t.transit.body.nameRu}
-                      </span>
-                      <span style={{ color: ASPECT_TONE_COLOR[aspectTone(t.aspect.name)] }}>
-                        {t.aspect.symbol}
-                      </span>
-                      <span
-                        className="ml-auto tabular-nums"
-                        style={{ color: night ? "rgba(255,255,255,0.5)" : "var(--muted)" }}
-                      >
-                        {t.orb.toFixed(1)}°
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
       {activeAspect && (() => {
         const pa = pointAt(activeAspect.a.lon, radiusFor(activeAspect.a.au, night));
         const pb = pointAt(activeAspect.b.lon, radiusFor(activeAspect.b.au, night));
@@ -1968,8 +1527,8 @@ export function OrreryDial({
             °/day
           </div>
           {(() => {
-            const { inSky, toNatal } = aspectsOf(active, skyAspects);
-            if (inSky.length === 0 && toNatal.length === 0) return null;
+            const inSky = aspectsOf(active, skyAspects);
+            if (inSky.length === 0) return null;
             const dim = night ? "rgba(255,255,255,0.4)" : "var(--muted)";
             const ink = night ? "rgba(255,255,255,0.85)" : "var(--foreground)";
             const group = (title: string, hits: AspectHit[]) =>

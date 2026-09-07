@@ -2,60 +2,36 @@
 
 /* theme: manual toggle via data-theme on <html>, system fallback */
 :root {
-  /* Midday's parchment canvas is darker than the cards on purpose: depth comes
-     from surface contrast, so panels separate without shadow. This page has no
-     panels. The canvas IS the paper here, and at #dbdad7 it read as a grey wash
-     behind the dial rather than as a sheet the dial is drawn on. */
+  /* The canvas is the paper the dial is drawn on. At Midday's parchment
+     (#dbdad7) it read as a grey wash behind the dial; this page has no cards
+     to separate, so the sheet can be light. */
   --background: #f4f3f0; /* paper */
   --surface: #ffffff;    /* paper */
-  --surface-sunk: #e6e4e0; /* sand — inset rows, nested panels */
+  --surface-sunk: #e6e4e0; /* sand */
   --foreground: #121212; /* ink */
   --muted: #616161;      /* smoke */
   --muted-strong: #2e2e2e;
-  /* Warmed a touch off Midday's neutral grays: --border also fills the moon
-     petals on the cycle dial, and a true gray turned them cold. Stays inside
-     Midday's own warm-neutral range (Sand #e6e4e0 → Parchment #dbdad7). */
+  /* Warmed a touch off neutral gray, inside Midday's own warm-neutral range
+     (Sand #e6e4e0 → Parchment #dbdad7). */
   --border: #d3d1cb;
   --border-strong: #b8b6b0;
 
-  /* Midday rations colour to a single chromatic accent. The rule is the
-     rationing, not the hue — and here the hue matters: --accent draws the
-     "сегодня" marker on the timeline as well as the milestone diamonds. Moss
-     green reads as "good", not as "now", and collided with the green milestones
-     sitting next to it. So terracotta keeps the accent slot and moss moves to
-     --positive, where "good" is exactly what it means. */
-  --accent: #b35338; /* terracotta — now / attention */
+  /* One chromatic accent, rationed. Terracotta reads as "now": it marks the
+     knob on the ruler and Earth on the dial, the place you are standing. */
+  --accent: #b35338;
   --accent-soft: #d68b6f;
 
   --gold: #a8862b;
 
-  --positive: #4caf50; /* moss — Midday's green, in its honest role */
+  --positive: #4caf50;
   --negative: #a04040;
   /* The aspect palette needs its three tones to weigh the same. --negative is a
      deep brick, right for a warning number but far darker than the turquoise and
      the violet, so two aspects of equal strength looked unequal. This is the same
      red brought up to their lightness. */
   --aspect-negative: #cf6b62;
-  /* The transit layer wears the same hues with the saturation pulled back
-     and the lightness lifted. Same meaning, chalkier: today's sky sits over
-     her chart, it is not part of it. At identical colour a dashed thread and
-     a solid chord read as one drawing in two line styles, not two layers. */
-  --aspect-positive-transit: #84bdb9;
-  --aspect-negative-transit: #ce9994;
-  --aspect-neutral-transit: #a9a2b8;
 
-  /* Heatmap scale (low → high) */
-  --heat-0: #e6e4e0;
-  --heat-1: #cdd8c6;
-  --heat-2: #a7c3a2;
-  --heat-3: #74a874;
-  --heat-4: #3d7a41;
-  /* Hover lift for a card, and the fill of the active day slice on the cycle
-     ring. Both used to be a hardcoded white, which reads as "raised" on
-     parchment and as a hole punched in the page in the dark theme. */
   --surface-hover: #ffffff;
-  --slice-active: #ffffff;
-  --surface-space: #ffffff;
 
   /* Planet tints for the orrery. Desaturated on purpose: this palette rations
      colour, so each body gets a hue that hints at what it looks like without
@@ -91,22 +67,8 @@
   --positive: #89b482;
   --negative: #ea6962;
   --aspect-negative: #ea6962;
-  /* The transit layer wears the same hues with the saturation pulled back
-     and the lightness lifted. Same meaning, chalkier: today's sky sits over
-     her chart, it is not part of it. At identical colour a dashed thread and
-     a solid chord read as one drawing in two line styles, not two layers. */
-  --aspect-positive-transit: #84bdb9;
-  --aspect-negative-transit: #e09b97;
-  --aspect-neutral-transit: #a9a2b8;
 
-  --heat-0: #1c1917;
-  --heat-1: #44403c;
-  --heat-2: #78716c;
-  --heat-3: #cab16a;
-  --heat-4: #ea6962;
   --surface-hover: #1c1917;
-  --slice-active: #e7e5e4;
-  --surface-space: #080a12;
 
   --planet-mercury: #a8a29e;
   --planet-venus: #cab16a;
@@ -136,18 +98,8 @@
     --positive: #89b482;
     --negative: #ea6962;
     --aspect-negative: #ea6962;
-    --aspect-positive-transit: #84bdb9;
-    --aspect-negative-transit: #e09b97;
-    --aspect-neutral-transit: #a9a2b8;
 
-    --heat-0: #1c1917;
-    --heat-1: #44403c;
-    --heat-2: #78716c;
-    --heat-3: #cab16a;
-    --heat-4: #ea6962;
     --surface-hover: #1c1917;
-    --slice-active: #e7e5e4;
-    --surface-space: #080a12;
 
     --planet-mercury: #a8a29e;
     --planet-venus: #cab16a;
@@ -164,7 +116,6 @@
   --color-surface: var(--surface);
   --color-surface-sunk: var(--surface-sunk);
   --color-surface-hover: var(--surface-hover);
-  --color-surface-space: var(--surface-space);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-strong: var(--muted-strong);
@@ -206,35 +157,8 @@ body {
   letter-spacing: 0.025em;
 }
 
-/* A panel whose content is the night sky. In the dark theme the card takes the
-   dial's own field colour, so the plate stops reading as a card sitting on top
-   of space. Hover is pinned to the same colour: the lift would break the seam. */
-.panel-space,
-.panel-space:hover {
-  background: var(--surface-space);
-  /* The ground dissolves instead of snapping. It is the largest area on the page
-     that changes with the theme, and a cut here is most of what the eye calls a
-     harsh switch. */
-  transition: background-color 260ms ease;
-}
-@media (prefers-reduced-motion: reduce) {
-  .panel-space,
-  .panel-space:hover {
-    transition: none;
-  }
-}
-
-/* Transit prose — the read-me half of a transit row. Serif and a step smaller
-   than the glyph line above it, so every transit in the Astro and Cycle panels
-   reads as the same heading + body pair. */
-.transit-note {
-  font-family: var(--font-display), "PT Serif", Georgia, serif;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-/* Orrery starfield. Each star carries its own --o (base opacity) and delay, so
-   the sky breathes instead of pulsing in unison. */
+/* Starfield. Each star carries its own --o (base opacity) and delay, so the sky
+   breathes instead of pulsing in unison. */
 @keyframes star-twinkle {
   0%,
   100% {
@@ -242,153 +166,6 @@ body {
   }
   50% {
     opacity: calc(var(--o) * 0.35);
-  }
-}
-
-/* Astro list scroll box — a thin, self-effacing bar so a capped column doesn't
-   read as a widget. Firefox gets the standard properties, WebKit the shim. */
-.astro-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
-}
-.astro-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-.astro-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.astro-scroll::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 3px;
-}
-
-
-
-/* Liquid glass. One definition for every control that should read as a lens over
-   the page rather than a painted chip: the timeline pane, the day arrows, the
-   way back to today, the transit toggle. Tinted from --foreground so the
-   frosting is grey on the light scheme and pale on the dark one without a second
-   set of values, and never from --accent: on this page the accent means "aspect"
-   and would make a control look like a reading. */
-.glass {
-  background: color-mix(in srgb, var(--foreground) 2.5%, transparent);
-  border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  transition: background-color 140ms, border-color 140ms;
-}
-.glass:hover {
-  background: color-mix(in srgb, var(--foreground) 6%, transparent);
-  border-color: color-mix(in srgb, var(--foreground) 17%, transparent);
-}
-/* The one state that earns the accent: a layer is switched on. */
-.glass-on {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-}
-.glass-on:hover {
-  border-color: color-mix(in srgb, var(--accent) 75%, transparent);
-}
-
-/* The timeline pane on a phone. A thumb needs a wider target than a cursor, and
-   the frosting that reads clearly on a desktop screen disappears on a bright
-   phone held at arm's length. */
-@media (max-width: 639px) {
-  .timeline-pane {
-    background: color-mix(in srgb, var(--foreground) 8%, transparent);
-    border-color: color-mix(in srgb, var(--foreground) 28%, transparent);
-  }
-}
-
-/* The timeline rule. Not glass: a plainly raised piece of the interface. The
-   frosted version looked like a material with opinions, and what this element
-   needs to say is only "grab me and I move". Translucent rather than solid,
-   because the lines it crosses are the reason it is there — hiding them at the
-   very point being read would defeat it. */
-.timeline-pane,
-.timeline-grip {
-  background: color-mix(in srgb, var(--surface) 62%, transparent);
-  border: 1px solid var(--border-strong);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-  transition: background-color 140ms, border-color 140ms;
-}
-.timeline-grip:hover {
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border-color: var(--muted);
-}
-/* A thumb needs a wider target than a cursor, and on a bright phone screen held
-   at arm's length a soft edge disappears. */
-@media (max-width: 639px) {
-  .timeline-pane,
-  .timeline-grip {
-    background: color-mix(in srgb, var(--surface) 82%, transparent);
-    border-color: var(--muted);
-  }
-}
-
-/* Lunation marks. On the dark scheme a gold spark on near-black is the loudest
-   thing on the board, and the hollow full-moon ring is the quietest: the two
-   swap places against the ground they sit on, so each is corrected back toward
-   the other. */
-:root {
-  --moon-new-alpha: 1;
-  --moon-new-halo: 0.7;
-  --moon-full-border: var(--muted);
-}
-:root[data-theme="dark"] {
-  --moon-new-alpha: 0.55;
-  --moon-new-halo: 0.35;
-  --moon-full-border: var(--foreground);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --moon-new-alpha: 0.55;
-    --moon-new-halo: 0.35;
-    --moon-full-border: var(--foreground);
-  }
-}
-
-/* The month strip is the thing you drag, so it is cut into the page rather than
-   laid on it: a groove asks to be swiped in a way a flat row of labels never
-   did. The inner shadow does the work; on the dark scheme it has to be much
-   heavier, because a shadow on near-black is nearly invisible. */
-.time-scrub {
-  /* Tinted from the ink rather than filled with --surface-sunk: the sunk surface
-     is a solid grey and read as a slab. Four percent is enough to say "this
-     strip is a thing" without becoming the darkest area on a light page. */
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
-  border-radius: 5px;
-  box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.06);
-}
-:root[data-theme="dark"] .time-scrub {
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.55),
-    inset 0 -1px 0 color-mix(in srgb, var(--foreground) 8%, transparent);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .time-scrub {
-    box-shadow:
-      inset 0 2px 4px rgba(0, 0, 0, 0.55),
-      inset 0 -1px 0 color-mix(in srgb, var(--foreground) 8%, transparent);
-  }
-}
-
-
-/* The outgoing sky. Only the old picture animates; the new one is solid from the
-   first frame, so the panel behind is never visible through either. */
-@keyframes sky-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-.sky-out {
-  animation: sky-out 260ms ease-in forwards;
-}
-@media (prefers-reduced-motion: reduce) {
-  .sky-out {
-    animation-duration: 1ms;
   }
 }
 
@@ -414,9 +191,9 @@ body {
 }
 
 /* The two arrows beside the date. No box: a border here would make them look
-   like the buttons that used to sit under the ruler, and they are a step, not a
-   destination. The tap target is padding rather than size, so they stay small
-   next to the date and are still fingerable on a phone. */
+   like buttons, and they are a step, not a destination. The tap target is
+   padding rather than size, so they stay small next to the date and are still
+   fingerable on a phone. */
 .step {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 19px;
