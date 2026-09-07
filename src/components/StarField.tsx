@@ -20,9 +20,11 @@ function mulberry32(a: number) {
  * empty black — the dial looked like a picture hung on a wall rather than a
  * thing floating in the middle of somewhere very large.
  *
- * Barely there on purpose: small, dim, and breathing on long out-of-step cycles.
- * At this size and opacity it reads as depth; any brighter and it competes with
- * the planets, which are the only things on the page allowed to be bright.
+ * Small and dim, and every star on its own cycle: most breathe, a quarter of
+ * them flare past their resting brightness for a moment. Out of step on purpose,
+ * so the sky never pulses as one thing. At this size it reads as depth; any
+ * larger and it competes with the planets, which are the only things on the
+ * page allowed to be bright.
  */
 export function StarField() {
   const night = useIsDark();
@@ -36,8 +38,9 @@ export function StarField() {
         s: 0.6 + bright * bright * 1.5,
         o: 0.06 + bright * 0.34,
         warm: rnd() > 0.9,
-        delay: rnd() * 14,
-        dur: 6 + rnd() * 10,
+        sparkle: rnd() > 0.72,
+        delay: rnd() * 9,
+        dur: 2.2 + rnd() * 4.5,
       };
     });
   }, []);
@@ -49,7 +52,7 @@ export function StarField() {
       {stars.map((s, i) => (
         <span
           key={i}
-          className="absolute rounded-full"
+          className="star absolute rounded-full"
           style={
             {
               left: `${s.x}%`,
@@ -59,7 +62,7 @@ export function StarField() {
               background: s.warm ? "#ffe9c9" : "#dfe7f5",
               "--o": s.o,
               opacity: s.o,
-              animation: `star-twinkle ${s.dur.toFixed(1)}s ease-in-out ${s.delay.toFixed(1)}s infinite`,
+              animation: `${s.sparkle ? "star-sparkle" : "star-twinkle"} ${s.dur.toFixed(1)}s ease-in-out ${s.delay.toFixed(1)}s infinite`,
             } as CSSProperties
           }
         />

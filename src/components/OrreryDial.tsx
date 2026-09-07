@@ -381,7 +381,7 @@ const STARS = (() => {
     const keepRoll = rnd();
     const twinkle = rnd() > 0.12;
     const delay = rnd() * 6;
-    const dur = 3 + rnd() * 4;
+    const dur = 2 + rnd() * 3.5;
     const inField = Math.hypot(x - C, y - C) < R_OUTER + 12;
     if (inField && keepRoll > 0.3) continue;
     out.push({

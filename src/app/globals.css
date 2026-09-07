@@ -154,14 +154,36 @@ body {
 }
 
 /* Starfield. Each star carries its own --o (base opacity) and delay, so the sky
-   breathes instead of pulsing in unison. */
+   breathes instead of pulsing in unison. Two kinds of star: most dim and come
+   back, a few flare past their resting brightness the way a star does when the
+   air over it settles for a moment. */
 @keyframes star-twinkle {
   0%,
   100% {
     opacity: var(--o);
   }
   50% {
-    opacity: calc(var(--o) * 0.35);
+    opacity: calc(var(--o) * 0.15);
+  }
+}
+@keyframes star-sparkle {
+  0%,
+  100% {
+    opacity: var(--o);
+    transform: scale(1);
+  }
+  45% {
+    opacity: calc(var(--o) * 0.3);
+    transform: scale(0.8);
+  }
+  60% {
+    opacity: min(1, calc(var(--o) * 2.2));
+    transform: scale(1.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .star {
+    animation: none !important;
   }
 }
 
