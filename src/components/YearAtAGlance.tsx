@@ -210,6 +210,36 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
   useEffect(() => {
     selRef.current = selected;
   }, [selected]);
+
+  // A finger on the dial drags the date, the way the ruler does. Nothing is
+  // decided on the way down: a tap still belongs to the dial, so the drag only
+  // begins once the finger has moved further than a fingertip wobbles, and
+  // from then on the container holds the pointer so the sky keeps following
+  // even when the finger crosses off the disc. Rightward is later, as on the
+  // ruler.
+  const touchDrag = useRef<{ id: number; x0: number; ms0: number; live: boolean } | null>(null);
+  const TOUCH_PX_PER_DAY = 5;
+  const touchDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    takeOver();
+    if (e.pointerType === "mouse") return;
+    touchDrag.current = { id: e.pointerId, x0: e.clientX, ms0: selRef.current.getTime(), live: false };
+  };
+  const touchMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = touchDrag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x0;
+    if (!d.live) {
+      if (Math.abs(dx) < 8) return;
+      d.live = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    setSelected(addDays(new Date(d.ms0), Math.round(dx / TOUCH_PX_PER_DAY)));
+  };
+  const touchUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = touchDrag.current;
+    if (d?.live && e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    touchDrag.current = null;
+  };
   useEffect(() => {
     const el = root.current;
     if (!el) return;
@@ -350,7 +380,7 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
             </button>
           </div>
           {!away ? (
-            <span className="label">{touch ? "drag the ruler" : "scroll the dial"}</span>
+            <span className="label">{touch ? "drag the dial" : "scroll the dial"}</span>
           ) : (
             <span className="flex items-center gap-2">
               <button type="button" onClick={today} className="label reset-link">
@@ -375,8 +405,11 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
             phone screen, where the space is far taller than it is wide. */}
         <div
           className="flex-1 min-h-0 w-full flex items-center justify-center"
-          style={{ containerType: "size" }}
-          onPointerDown={takeOver}
+          style={{ containerType: "size", touchAction: "none" }}
+          onPointerDown={touchDown}
+          onPointerMove={touchMove}
+          onPointerUp={touchUp}
+          onPointerCancel={touchUp}
         >
           <div style={{ width: "min(100%, 100cqh)", aspectRatio: "1 / 1" }}>
             <OrreryDial

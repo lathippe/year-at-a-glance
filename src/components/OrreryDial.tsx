@@ -490,6 +490,9 @@ export function OrreryDial({
 }) {
   const isDark = useIsDark();
   const svgRef = useRef<SVGSVGElement | null>(null);
+  // Where a finger came down. A tap is judged on the way up, so a drag that
+  // starts on a planet scrubs the date instead of pinning the planet.
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const night = variant === "auto" ? isDark : variant === "night";
   /** Relation lines are a layer, off until asked for: click the Sun for all of
       them, or a planet for its own. On first sight the dial should be the sky,
@@ -696,6 +699,15 @@ export function OrreryDial({
         // afterwards instead of vanishing with the finger.
         onPointerDown={(e) => {
           if (e.pointerType === "mouse") return;
+          touchStart.current = { x: e.clientX, y: e.clientY };
+        }}
+        onPointerUp={(e) => {
+          if (e.pointerType === "mouse") return;
+          const st = touchStart.current;
+          touchStart.current = null;
+          // Moved more than a fingertip's wobble: that was a drag, and the page
+          // has already spent it on the date.
+          if (!st || Math.hypot(e.clientX - st.x, e.clientY - st.y) > 8) return;
           setTouchMode(true);
           const hit = pickAt(e);
           setHover(hit);
