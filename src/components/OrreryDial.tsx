@@ -165,12 +165,12 @@ const RELATION_CUTOFF_DEG = 6;
  */
 const RELATION_STYLE = {
   gamma: 1.5,
-  opacity: [0.1, 0.82] as const,
-  width: [0.4, 1.15] as const,
-  hotOpacity: [0.45, 1] as const,
-  hotWidth: [0.7, 1.5] as const,
-  glow: 0.45,
-  glowWidth: 3,
+  opacity: [0.12, 0.9] as const,
+  width: [0.3, 0.75] as const,
+  hotOpacity: [0.5, 1] as const,
+  hotWidth: [0.5, 1.05] as const,
+  glow: 0.35,
+  glowWidth: 2.4,
 };
 function relationStroke(nearness: number, hot: boolean) {
   const k = Math.pow(Math.min(1, Math.max(0, nearness)), RELATION_STYLE.gamma);
@@ -193,11 +193,29 @@ function deviationLabel(rel: RelationDef, deviation: number): string {
   return `${rel.label} ${sign} ${Math.abs(deviation).toFixed(1)}°`;
 }
 
-/** One ink for every relation. Colour used to say which kind of angle it was,
-    which is a verdict; the number says it now. Neutral so it never competes
-    with the planet tints, and a step darker than the rim on paper because a
-    thin line on white needs more weight than the same line on black. */
+/** The neutral ink: coincidences, sixths, and anything without a hue of its
+    own. A step darker on paper because a thin line on white needs more weight
+    than the same line on black. */
 const RELATION_INK = { day: "#3f4650", night: "#d5dbe6" };
+
+/**
+ * Hue says which fraction, and only that. Three hues, because three is what
+ * validates all-pairs for colour-blind readers in both skies (the fourth hue
+ * collides with one of these under deutan or protan vision in the dark, and
+ * the reference palette stops at three for the same reason). The sixth, the
+ * finest division drawn, wears the neutral ink like the coincidence. Violet
+ * rather than blue so a line is never in Earth's colour. Both sets pass the
+ * six checks against #f4f3f0 and #080a12 with every pair above 3:1.
+ */
+const RELATION_HUE: Partial<Record<RelationDef["key"], { day: string; night: string }>> = {
+  half: { day: "#4a3aa7", night: "#9085e9" },
+  third: { day: "#199e70", night: "#199e70" },
+  quarter: { day: "#d95926", night: "#d95926" },
+};
+function relationInk(rel: RelationDef, night: boolean): string {
+  const h = RELATION_HUE[rel.key];
+  return h ? (night ? h.night : h.day) : night ? RELATION_INK.night : RELATION_INK.day;
+}
 
 const MOON_OFFSET = 8.2;
 
@@ -991,7 +1009,7 @@ export function OrreryDial({
                             // Full ink on paper: at three quarters the grey fell
                             // to 3.3:1, under the line for ten-pixel text.
                             opacity={night ? 0.8 : 1}
-                            style={{ fontSize: 10 }}
+                            style={{ fontSize: 8.5, letterSpacing: "0.01em" }}
                           >
                             {en(p.nameRu)}
                           </text>
@@ -1022,7 +1040,7 @@ export function OrreryDial({
                   // short of a quarter is a fainter line than one a tenth short,
                   // and nothing is either on or off. The mapping lives in
                   // relationStroke.
-                  const ink = night ? RELATION_INK.night : RELATION_INK.day;
+                  const ink = relationInk(r.rel, night);
                   const st = relationStroke(r.nearness, hot);
                   return (
                     <g key={`rel-${i}`} style={{ transition: "opacity 120ms" }}>
@@ -1344,7 +1362,11 @@ export function OrreryDial({
             <div className="text-sm font-medium" style={{ color: night ? "#ffffff" : "var(--foreground)" }}>
               {en(activeRelation.a.nameRu)} · {en(activeRelation.b.nameRu)}
             </div>
-            <div className="text-[13px] tabular-nums mt-0.5" style={{ color: night ? "#ffffff" : "var(--foreground)" }}>
+            <div className="text-[13px] tabular-nums mt-0.5 flex items-center gap-1.5" style={{ color: night ? "#ffffff" : "var(--foreground)" }}>
+              <span
+                aria-hidden
+                style={{ width: 7, height: 7, borderRadius: 7, background: relationInk(activeRelation.rel, night), display: "inline-block" }}
+              />
               {deviationLabel(activeRelation.rel, activeRelation.deviation)}
             </div>
             <div className="text-[11px] tabular-nums" style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
@@ -1402,7 +1424,11 @@ export function OrreryDial({
                   relations
                 </div>
                 {hits.map((h, i) => (
-                  <div key={i} className="text-[11px] flex items-baseline gap-1.5 tabular-nums">
+                  <div key={i} className="text-[11px] flex items-center gap-1.5 tabular-nums">
+                    <span
+                      aria-hidden
+                      style={{ width: 6, height: 6, borderRadius: 6, background: relationInk(h.rel, night), display: "inline-block", flexShrink: 0 }}
+                    />
                     <span style={{ color: ink, minWidth: 30 }}>{h.rel.angle === 0 ? "same" : h.rel.label}</span>
                     <span style={{ color: dim, minWidth: 30 }}>{h.rel.angle}°</span>
                     <span style={{ color: ink, minWidth: 44 }}>
