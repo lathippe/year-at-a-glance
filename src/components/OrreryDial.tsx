@@ -153,9 +153,41 @@ type RelationDef = (typeof RELATIONS)[number];
     read. Every threshold in this file is this one. */
 const RELATION_CUTOFF_DEG = 6;
 
-/** How a fraction is written next to its size in degrees. */
-function relationLabel(rel: RelationDef): string {
-  return rel.angle === 0 ? "coincidence" : `${rel.label} of a circle · ${rel.angle}°`;
+/**
+ * How nearness becomes ink. The one place the continuous encoding lives, so it
+ * can be swapped by eye without touching the drawing. Nearness runs 0 at the
+ * cutoff to 1 exact; the curve is bent so the last degree counts for more than
+ * the first, which is how the eye already weighs "nearly" against "roughly".
+ * Pointing at a line or a body lifts the whole range but keeps its order.
+ */
+const RELATION_STYLE = {
+  gamma: 1.5,
+  opacity: [0.1, 0.82] as const,
+  width: [0.4, 1.15] as const,
+  hotOpacity: [0.45, 1] as const,
+  hotWidth: [0.7, 1.5] as const,
+  glow: 0.45,
+  glowWidth: 3,
+};
+function relationStroke(nearness: number, hot: boolean) {
+  const k = Math.pow(Math.min(1, Math.max(0, nearness)), RELATION_STYLE.gamma);
+  const lerp = (r: readonly [number, number]) => r[0] + (r[1] - r[0]) * k;
+  const opacity = lerp(hot ? RELATION_STYLE.hotOpacity : RELATION_STYLE.opacity);
+  const width = lerp(hot ? RELATION_STYLE.hotWidth : RELATION_STYLE.width);
+  return {
+    opacity,
+    width,
+    glowOpacity: opacity * RELATION_STYLE.glow,
+    glowWidth: width * RELATION_STYLE.glowWidth,
+  };
+}
+
+/** "1/4 − 2.3°": the fraction and how far the pair stands from it, signed.
+    Short of the fraction is negative. Exact to a tenth is written as exact. */
+function deviationLabel(rel: RelationDef, deviation: number): string {
+  if (Math.abs(deviation) < 0.05) return `${rel.label} exact`;
+  const sign = deviation < 0 ? "−" : "+";
+  return `${rel.label} ${sign} ${Math.abs(deviation).toFixed(1)}°`;
 }
 
 /** The degree scale at the rim. A thin circle just outside the last orbit, a
@@ -218,29 +250,24 @@ function bodyInk(p: HelioPos, night: boolean): string {
   return p.tone;
 }
 
-type RelationHit = { rel: RelationDef; label: string; strength: number };
+type RelationHit = { rel: RelationDef; label: string; deviation: number; nearness: number };
 
 /** How near a pair stands to the fraction, 1 exact, 0 at the cutoff. The only
     thing that ranks a relation: no kind of angle outranks another. */
-const MIN_STRENGTH = 0.3;
-
-function strengthOf(off: number): number {
-  return 1 - off / RELATION_CUTOFF_DEG;
+function nearnessOf(deviation: number): number {
+  return 1 - Math.abs(deviation) / RELATION_CUTOFF_DEG;
 }
 
-/** Every relation a body stands in. Loose ones are dropped rather than listed:
-    six degrees off a sixth is noise. */
+/** Every relation a body stands in, nearest first. Nothing is dropped: the
+    deviation on each row says how loose it is. */
 function relationsOf(p: HelioPos, sky: Relation[]): RelationHit[] {
   const inSky: RelationHit[] = [];
   for (const r of sky) {
     const other = r.a.nameRu === p.nameRu ? r.b : r.b.nameRu === p.nameRu ? r.a : null;
     if (!other) continue;
-    inSky.push({ rel: r.rel, label: other.nameRu, strength: strengthOf(r.off) });
+    inSky.push({ rel: r.rel, label: other.nameRu, deviation: r.deviation, nearness: r.nearness });
   }
-  return inSky
-    .filter((x) => x.strength >= MIN_STRENGTH)
-    .sort((a, b) => b.strength - a.strength)
-    .slice(0, 5);
+  return inSky.sort((a, b) => b.nearness - a.nearness).slice(0, 6);
 }
 
 /** Distance from a point to a segment. The relation lines carry no marker, so
@@ -264,8 +291,12 @@ type Relation = {
   a: HelioPos;
   b: HelioPos;
   rel: RelationDef;
-  /** How far off the fraction the pair stands, degrees, unsigned. */
-  off: number;
+  /** The angle actually measured between the two, 0..180. */
+  angle: number;
+  /** Measured minus exact, degrees. Negative is short of the fraction. */
+  deviation: number;
+  /** 1 exact, 0 at the cutoff. */
+  nearness: number;
 };
 
 function findRelations(planets: HelioPos[]): Relation[] {
@@ -275,8 +306,16 @@ function findRelations(planets: HelioPos[]): Relation[] {
     for (let j = i + 1; j < withGeo.length; j++) {
       const d = angularDiff(withGeo[i].geoLon!, withGeo[j].geoLon!);
       for (const rel of RELATIONS) {
-        const off = Math.abs(d - rel.angle);
-        if (off <= RELATION_CUTOFF_DEG) out.push({ a: withGeo[i], b: withGeo[j], rel, off });
+        const deviation = d - rel.angle;
+        if (Math.abs(deviation) <= RELATION_CUTOFF_DEG)
+          out.push({
+            a: withGeo[i],
+            b: withGeo[j],
+            rel,
+            angle: d,
+            deviation,
+            nearness: nearnessOf(deviation),
+          });
       }
     }
   }
@@ -966,6 +1005,11 @@ export function OrreryDial({
                   .filter((p) => !p.isEarth)
                   .map((p) => {
                     const pt = dialPoint(p, earth, night);
+                    // Below the body for most; for the two outer orbits the name
+                    // steps inward instead, or it runs into the degree scale.
+                    const outer = radiusFor(p.au, night) > R_OUTER - 30;
+                    const ux = outer ? (C - pt.x) / Math.hypot(C - pt.x, C - pt.y) : 0;
+                    const uy = outer ? (C - pt.y) / Math.hypot(C - pt.x, C - pt.y) : 1;
                     return (
                       <g key={`name-${p.nameRu}`}>
                         {/* Only the bodies actually in a relation are named, and
@@ -973,8 +1017,8 @@ export function OrreryDial({
                             the sky. */}
                         {named.has(p.nameRu) && !p.isMoon && (
                           <text
-                            x={pt.x}
-                            y={pt.y + 13}
+                            x={pt.x + ux * 14}
+                            y={pt.y + uy * 13 + (outer ? 4 : 0)}
                             textAnchor="middle"
                             fill="var(--muted)"
                             opacity={0.75}
@@ -1004,29 +1048,31 @@ export function OrreryDial({
                   const bx = mx + (mx - C) * 0.16;
                   const by = my + (my - C) * 0.16;
                   const arc = `M${pa.x} ${pa.y} Q${bx} ${by} ${pb.x} ${pb.y}`;
-                  // One line, one ink, one weight. The waist that used to thin
-                  // toward the middle graded the kinds of angle against each
-                  // other, which is a reading; the number on the card is the
-                  // only thing that grades anything now.
+                  // One ink. How near the pair stands to the fraction is the
+                  // line's weight and opacity, continuously: a pair two degrees
+                  // short of a quarter is a fainter line than one a tenth short,
+                  // and nothing is either on or off. The mapping lives in
+                  // relationStroke.
                   const ink = night ? RELATION_INK.night : RELATION_INK.day;
+                  const st = relationStroke(r.nearness, hot);
                   return (
                     <g key={`rel-${i}`} style={{ transition: "opacity 120ms" }}>
                       <path
                         d={arc}
                         fill="none"
                         stroke={ink}
-                        strokeWidth={hot ? 3.4 : 1.9}
+                        strokeWidth={st.glowWidth}
                         strokeLinecap="round"
                         filter={`url(#relation-glow-${uid})`}
-                        opacity={hot ? 0.4 : 0.12}
+                        opacity={st.glowOpacity}
                       />
                       <path
                         d={arc}
                         fill="none"
                         stroke={ink}
-                        strokeWidth={hot ? 1.1 : 0.6}
+                        strokeWidth={st.width}
                         strokeLinecap="round"
-                        opacity={hot ? 0.85 : 0.3}
+                        opacity={st.opacity}
                       />
                     </g>
                   );
@@ -1329,8 +1375,11 @@ export function OrreryDial({
             <div className="text-sm font-medium" style={{ color: night ? "#ffffff" : "var(--foreground)" }}>
               {en(activeRelation.a.nameRu)} · {en(activeRelation.b.nameRu)}
             </div>
-            <div className="text-[11px] tabular-nums mt-0.5" style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
-              {relationLabel(activeRelation.rel)} · off by {activeRelation.off.toFixed(1)}°
+            <div className="text-[13px] tabular-nums mt-0.5" style={{ color: night ? "#ffffff" : "var(--foreground)" }}>
+              {deviationLabel(activeRelation.rel, activeRelation.deviation)}
+            </div>
+            <div className="text-[11px] tabular-nums" style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
+              measured {activeRelation.angle.toFixed(1)}° · exact {activeRelation.rel.angle}°
             </div>
           </div>
         );
@@ -1385,8 +1434,11 @@ export function OrreryDial({
                 </div>
                 {hits.map((h, i) => (
                   <div key={i} className="text-[11px] flex items-baseline gap-1.5 tabular-nums">
-                    <span style={{ color: ink, minWidth: 34 }}>{h.rel.angle === 0 ? "same" : h.rel.label}</span>
+                    <span style={{ color: ink, minWidth: 30 }}>{h.rel.angle === 0 ? "same" : h.rel.label}</span>
                     <span style={{ color: dim, minWidth: 30 }}>{h.rel.angle}°</span>
+                    <span style={{ color: ink, minWidth: 44 }}>
+                      {Math.abs(h.deviation) < 0.05 ? "exact" : `${h.deviation < 0 ? "−" : "+"}${Math.abs(h.deviation).toFixed(1)}°`}
+                    </span>
                     <span style={{ color: ink }}>{en(h.label)}</span>
                   </div>
                 ))}
