@@ -1090,7 +1090,7 @@ export function OrreryDial({
                         const gx = 0.25 * pa.x + 0.5 * bx + 0.25 * pb.x;
                         const gy = 0.25 * pa.y + 0.5 * by + 0.25 * pb.y;
                         const nl = Math.hypot(gx - C, gy - C) || 1;
-                        const off = 5.5;
+                        const off = 4.5;
                         const lx = gx + ((gx - C) / nl) * off;
                         const ly = gy + ((gy - C) / nl) * off;
                         let ang = (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180) / Math.PI;
@@ -1105,11 +1105,11 @@ export function OrreryDial({
                             dominantBaseline="central"
                             fill={ink}
                             stroke={night ? "#080a12" : "#f4f3f0"}
-                            strokeWidth={2}
+                            strokeWidth={1.6}
                             opacity={Math.min(1, st.opacity + 0.15)}
                             pointerEvents="none"
                             style={{
-                              fontSize: 7,
+                              fontSize: 5.5,
                               fontFamily: "var(--font-mono), ui-monospace, monospace",
                               letterSpacing: "0.02em",
                               paintOrder: "stroke",
