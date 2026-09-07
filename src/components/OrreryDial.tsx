@@ -1079,40 +1079,44 @@ export function OrreryDial({
                         strokeLinecap="round"
                         opacity={st.opacity}
                       />
-                      {/* The fraction, drawn rather than written: a small disc
-                          at the arc's midpoint with the fraction of it filled,
-                          a third for 1/3, a sixth for 1/6, half for 1/2. A
-                          number of degrees is not a shape anyone holds in their
-                          head; a slice of a circle is. It fades with the line.
-                          The coincidence gets a filled dot: the whole and the
-                          nothing are the same point. */}
-                      {(() => {
+                      {/* The fraction, written along the line the way a drawing
+                          carries a dimension: 1/3, 1/6, 1/2, at the arc's
+                          midpoint a few pixels to the outer side, turned to run
+                          with the line and kept upright. It fades with the
+                          line. A hairline halo in the sky's colour keeps it
+                          legible where lines cross. A coincidence needs no
+                          label: the two bodies stand together. */}
+                      {r.rel.angle > 0 && (() => {
                         const gx = 0.25 * pa.x + 0.5 * bx + 0.25 * pb.x;
                         const gy = 0.25 * pa.y + 0.5 * by + 0.25 * pb.y;
                         const nl = Math.hypot(gx - C, gy - C) || 1;
-                        const off = 7.5;
-                        const cx = gx + ((gx - C) / nl) * off;
-                        const cy = gy + ((gy - C) / nl) * off;
-                        const rad = 4;
-                        const sky = night ? "#080a12" : "#f4f3f0";
-                        const a = (r.rel.angle * Math.PI) / 180;
-                        const ex = cx + rad * Math.sin(a);
-                        const ey = cy - rad * Math.cos(a);
-                        const wedge =
-                          r.rel.angle === 0
-                            ? null
-                            : r.rel.angle >= 180
-                            ? `M${cx} ${cy - rad} A${rad} ${rad} 0 0 1 ${cx} ${cy + rad} L${cx} ${cy} Z`
-                            : `M${cx} ${cy} L${cx} ${cy - rad} A${rad} ${rad} 0 0 1 ${ex} ${ey} Z`;
+                        const off = 5.5;
+                        const lx = gx + ((gx - C) / nl) * off;
+                        const ly = gy + ((gy - C) / nl) * off;
+                        let ang = (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180) / Math.PI;
+                        if (ang > 90) ang -= 180;
+                        if (ang < -90) ang += 180;
                         return (
-                          <g opacity={Math.min(1, st.opacity + 0.15)} pointerEvents="none">
-                            <circle cx={cx} cy={cy} r={rad} fill={sky} stroke={ink} strokeWidth={0.5} />
-                            {wedge ? (
-                              <path d={wedge} fill={ink} />
-                            ) : (
-                              <circle cx={cx} cy={cy} r={1.5} fill={ink} />
-                            )}
-                          </g>
+                          <text
+                            x={lx}
+                            y={ly}
+                            transform={`rotate(${ang.toFixed(1)} ${lx} ${ly})`}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fill={ink}
+                            stroke={night ? "#080a12" : "#f4f3f0"}
+                            strokeWidth={2}
+                            opacity={Math.min(1, st.opacity + 0.15)}
+                            pointerEvents="none"
+                            style={{
+                              fontSize: 7,
+                              fontFamily: "var(--font-mono), ui-monospace, monospace",
+                              letterSpacing: "0.02em",
+                              paintOrder: "stroke",
+                            }}
+                          >
+                            {r.rel.label}
+                          </text>
                         );
                       })()}
                     </g>
