@@ -7,16 +7,13 @@ import { useIsDark } from "@/lib/useIsDark";
 import { useSelectedDate } from "@/lib/selectedDate";
 import { blendHex, mixHex, planetTone, rimFor } from "@/lib/planetTones";
 
-/** The twelve signs on the rim, in order from 0°. */
-const ZODIAC_GLYPHS = ["♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"] as const;
-
 
 const SIZE = 460;
 const C = SIZE / 2;
 // The disc is 230 across the radius and a body's glow reaches some eight px past
 // its ring, so Neptune at 212 fills the circle without touching the edge.
 const R_INNER = 54; // Mercury
-const R_OUTER = 198; // Neptune, pulled in to free a band for the zodiac
+const R_OUTER = 198; // Neptune, pulled in to free a band for the scale
 
 // Distances run 0.39 AU to 30 AU. Linear, Mercury through Mars collapse onto the
 // Sun; logarithmic, every orbit gets a readable gap. The dial trades true scale
@@ -161,8 +158,15 @@ function relationLabel(rel: RelationDef): string {
   return rel.angle === 0 ? "coincidence" : `${rel.label} of a circle · ${rel.angle}°`;
 }
 
-/** Radius of the rim the sign glyphs sit inside. */
-const R_RING = 224;
+/** The degree scale at the rim. A thin circle just outside the last orbit, a
+    tick every ten degrees, a number every thirty. It is the frame of the
+    drawing and the coordinate of everything in it, and means nothing on its
+    own. Ticks grow outward so they never touch Neptune's glow; the number
+    stands where a major tick would, so a horizontal label at 0° or 180° never
+    runs into a horizontal tick. */
+const R_SCALE = 207;
+const TICK_LEN = 3.2;
+const R_SCALE_LABEL = 214.5;
 
 /** One ink for every relation. Colour used to say which kind of angle it was,
     which is a verdict; the number says it now. Neutral so it never competes
@@ -170,8 +174,8 @@ const R_RING = 224;
     thin line on white needs more weight than the same line on black. */
 const RELATION_INK = { day: "#3f4650", night: "#d5dbe6" };
 
-/** Muted on purpose: the rim may not compete with the planet tints. */
-const ZODIAC_INK = { day: "#6f7b88", night: "#8b95a3" };
+/** Muted on purpose: the scale may not compete with the planet tints. */
+const SCALE_INK = { day: "#6f7b88", night: "#8b95a3" };
 
 const MOON_OFFSET = 8.2;
 
@@ -360,9 +364,6 @@ const EN: Record<string, string> = {
     "Меркурий" ends up under an English heading. */
 const en = (s: string) => EN[s] ?? s;
 
-const SIGNS_EN = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra",
-  "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
-
 /** A body's colour as an actual value. `p.tone` is a CSS variable — good for a
     fill, useless for arithmetic: mixHex and blendHex hand back anything that is
     not a hex, so a gradient built from p.tone comes out as the same flat colour
@@ -399,6 +400,7 @@ export function OrreryDial({
   maxWidth = SIZE,
   variant = "auto",
   wheelScrub = true,
+  lit = [],
 }: {
   planets: HelioPos[];
   /** The dial is drawn at 460 and scales down; inside a column it wants a cap. */
@@ -408,6 +410,10 @@ export function OrreryDial({
   /** Off when the page owns the wheel itself, so the gesture works beside the
       dial as well as over it and nothing counts a scroll twice. */
   wheelScrub?: boolean;
+  /** English names of bodies the page wants lifted. Their orbits come forward
+      and everyone else steps back, so a pair named elsewhere on the page can
+      be found on the dial without hunting. */
+  lit?: string[];
 }) {
   const isDark = useIsDark();
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -429,7 +435,6 @@ export function OrreryDial({
       ...e,
       name: "Sun",
       nameRu: "Солнце",
-      glyph: "☉",
       tone: planetTone("Sun", night),
       isEarth: false,
       isMoon: false,
@@ -483,7 +488,7 @@ export function OrreryDial({
     ? skyRelations.filter((r) => r.a.nameRu === hoveredBody || r.b.nameRu === hoveredBody)
     : [];
 
-  const [signHover, setSignHover] = useState<number | null>(null);
+  const litSet = lit.length ? new Set(lit) : null;
 
   // Scrolling over the dial walks the calendar, a day at a time, unless a body
   // is being read: then the wheel belongs to the page again. State is mirrored
@@ -880,12 +885,11 @@ export function OrreryDial({
             fill="none"
             stroke={p.tone}
             strokeWidth={0.7}
-            // One lit state, whatever asked for it: pointing at the body or at
-            // its sign brings the orbit forward the same amount. The separation
-            // comes from the others stepping back.
+            // One lit state, whatever asked for it: pointing at the body or
+            // naming it from the page brings the orbit forward the same amount.
+            // The separation comes from the others stepping back.
             opacity={
-              (shown === p.nameRu ||
-              (signHover != null && p.signIdx === signHover)
+              (shown === p.nameRu || litSet?.has(p.name)
                 ? night
                   ? 0.3
                   : 0.28
@@ -897,55 +901,55 @@ export function OrreryDial({
           />
           ))}
 
-        {/* The twelve signs, on their own band at the rim. Hovering one lights
-            whoever is standing in it. */}
-        <g>
-          {ZODIAC_GLYPHS.map((glyph, i) => {
-            const mid = pointAt(i * 30 + 15, R_RING - 22);
-            const hot = signHover === i;
-            // A sector with somebody in it today earns its ink; an empty one
-            // recedes. The ring stops being a uniform decoration and starts
-            // showing where the sky is busy.
-            const busy = planets.some(
-              (p) => !p.isEarth && p.geoLon != null && p.signIdx === i
-            );
+        {/* The degree scale: zero at three o'clock, counting counterclockwise,
+            the way the bodies run. Nothing here is a control. */}
+        <g pointerEvents="none" aria-hidden>
+          <circle
+            cx={C}
+            cy={C}
+            r={R_SCALE}
+            fill="none"
+            stroke={night ? SCALE_INK.night : SCALE_INK.day}
+            strokeWidth={0.6}
+            opacity={night ? 0.4 : 0.5}
+          />
+          {Array.from({ length: 36 }, (_, i) => {
+            const deg = i * 10;
+            if (deg % 30 === 0) return null;
+            const a = pointAt(deg, R_SCALE);
+            const b = pointAt(deg, R_SCALE + TICK_LEN);
             return (
-              <g key={`sign-${i}`}>
-                <circle
-                  cx={mid.x}
-                  cy={mid.y}
-                  r={11}
-                  fill="transparent"
-                  style={{ cursor: "pointer" }}
-                  onMouseEnter={() => setSignHover(i)}
-                  onMouseLeave={() => setSignHover((v) => (v === i ? null : v))}
-                />
-                {/* Hover is ink, not a new hue and not a size jump. Gold spoke a
-                    colour the dial uses for nothing else, and growing the glyph
-                    moved the very thing being pointed at. */}
-                {hot && (
-                  <circle
-                    cx={mid.x}
-                    cy={mid.y}
-                    r={11}
-                    fill="var(--foreground)"
-                    opacity={night ? 0.12 : 0.07}
-                    pointerEvents="none"
-                  />
-                )}
-                <text
-                  x={mid.x}
-                  y={mid.y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fill={hot ? "var(--foreground)" : night ? ZODIAC_INK.night : ZODIAC_INK.day}
-                  opacity={hot ? 1 : busy ? (night ? 0.75 : 0.85) : night ? 0.22 : 0.3}
-                  pointerEvents="none"
-                  style={{ fontSize: 13.5, fontWeight: hot ? 600 : 400 }}
-                >
-                  {glyph}
-                </text>
-              </g>
+              <line
+                key={`tick-${deg}`}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke={night ? SCALE_INK.night : SCALE_INK.day}
+                strokeWidth={0.7}
+                opacity={night ? 0.55 : 0.6}
+              />
+            );
+          })}
+          {Array.from({ length: 12 }, (_, i) => {
+            const deg = i * 30;
+            const at = pointAt(deg, R_SCALE_LABEL);
+            return (
+              <text
+                key={`deg-${deg}`}
+                x={at.x}
+                y={at.y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill={night ? SCALE_INK.night : SCALE_INK.day}
+                style={{
+                  fontSize: 8.5,
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {deg}°
+              </text>
             );
           })}
         </g>
@@ -1094,20 +1098,12 @@ export function OrreryDial({
         {planets.map((p, gi) => {
           const r = radiusFor(p.au, night);
           const pt = dialPoint(p, earthPos, night);
-          // A body lights up when the pointer is on it, or on the sign it is
-          // standing in right now.
-          const inLitSign =
-            !p.isEarth && signHover != null && p.geoLon != null && p.signIdx === signHover;
-          const isHover = shown === p.nameRu || inLitSign;
-          // Hovering a sign that actually holds something pushes everyone else
-          // back, so the group in it reads as a group. An empty sign changes
-          // nothing: there would be nothing to compare against. Earth has no
-          // geocentric sign: it is the vantage point, so it steps back with the
-          // rest whenever a sector is being pointed at.
-          const signHolds =
-            signHover != null &&
-            planets.some((x) => !x.isEarth && x.geoLon != null && x.signIdx === signHover);
-          const dimmed = p.isEarth ? signHolds : signHolds && p.signIdx !== signHover;
+          // A body lights up when the pointer is on it, or when the page names
+          // it. Naming a pair pushes everyone else back, so the pair reads as a
+          // pair.
+          const lifted = litSet?.has(p.name) ?? false;
+          const isHover = shown === p.nameRu || lifted;
+          const dimmed = litSet != null && !lifted;
           const deg = trailDegrees(p.degPerDay, night);
           const tailStart = pointAt(p.lon - deg, r);
           const gid = `trail-grad-${uid}-${gi}`;
@@ -1155,7 +1151,7 @@ export function OrreryDial({
                   a filled dark dot reads as a hole punched in the page, so the
                   body is hollow instead — a ring around the page's own white,
                   which reads as a small luminary rather than a blot. */}
-              {p.isMoon && inLitSign && (
+              {p.isMoon && lifted && (
                 <circle
                   cx={pt.x}
                   cy={pt.y}
@@ -1201,10 +1197,10 @@ export function OrreryDial({
                 )
               ) : night ? (
                 <>
-                  {/* Standing in the sector under the pointer: the same gold lift
-                      the paper sky gives, so the answer to "who is in this sector"
+                  {/* Named from the page: the same gold lift
+                      the paper sky gives, so the answer to "which pair is this"
                       looks the same in both. */}
-                  {inLitSign && (
+                  {lifted && (
                     <circle
                       cx={pt.x}
                       cy={pt.y}
@@ -1244,12 +1240,12 @@ export function OrreryDial({
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={inLitSign ? (p.isEarth ? 6.4 : 6.8) : p.isEarth ? 3.7 : 4.1}
+                    r={lifted ? (p.isEarth ? 6.4 : 6.8) : p.isEarth ? 3.7 : 4.1}
                     // The lift is the body's own colour, only stronger. Gold said
                     // "selected" in a language nothing else on the dial speaks.
                     fill={p.tone}
-                    filter={`url(#${inLitSign ? "lift" : "body"}-glow-${uid})`}
-                    opacity={inLitSign ? 0.7 : isHover ? 0.42 : 0.26}
+                    filter={`url(#${lifted ? "lift" : "body"}-glow-${uid})`}
+                    opacity={lifted ? 0.7 : isHover ? 0.42 : 0.26}
                   />
                   {/* Lit, banded if it has bands, bounce on the far rim, sheen
                       over the top. The edge is where the shading runs out. */}
@@ -1314,53 +1310,6 @@ export function OrreryDial({
         })}
       </svg>
 
-      {signHover !== null && (() => {
-        // Earth is left out: it is the point everything is being read from, and
-        // its own sign here is heliocentric, which says nothing about her chart.
-        const inside = planets.filter(
-          (p) => !p.isEarth && p.geoLon != null && p.signIdx === signHover
-        );
-        return (
-          <div
-            className="absolute z-20 pointer-events-none rounded-md px-2.5 py-1.5"
-            style={{
-              left: `${(pointAt(signHover * 30 + 15, R_RING - 22).x / SIZE) * 100}%`,
-              top: `${(pointAt(signHover * 30 + 15, R_RING - 22).y / SIZE) * 100}%`,
-              transform: "translate(-50%, -115%)",
-              background: night ? "rgba(8, 10, 16, 0.94)" : "var(--surface)",
-              border: night ? "1px solid rgba(255,255,255,0.16)" : "1px solid var(--border-strong)",
-              minWidth: 190,
-              maxWidth: 320,
-            }}
-          >
-            <div
-              className="text-sm font-medium"
-              style={{ color: night ? "#ffffff" : "var(--foreground)" }}
-            >
-              {ZODIAC_GLYPHS[signHover]} {SIGNS_EN[signHover]}
-            </div>
-            {inside.length > 0 && (
-              <div className="mt-1.5 flex flex-col gap-0.5">
-                {inside.map((p) => (
-                  <div key={p.nameRu} className="text-[11px] flex items-center gap-1.5">
-                    <span style={{ width: 6, height: 6, borderRadius: 6, background: p.tone, display: "inline-block" }} />
-                    <span style={{ color: night ? "rgba(255,255,255,0.9)" : "var(--foreground)" }}>
-                      {en(p.nameRu)}
-                    </span>
-                    <span
-                      className="tabular-nums ml-auto"
-                      style={{ color: night ? "rgba(255,255,255,0.5)" : "var(--muted)" }}
-                    >
-                      {Math.floor(p.degreeInSign)}°
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
       {activeRelation && (() => {
         const pa = pointAt(activeRelation.a.lon, radiusFor(activeRelation.a.au, night));
         const pb = pointAt(activeRelation.b.lon, radiusFor(activeRelation.b.au, night));
@@ -1417,7 +1366,7 @@ export function OrreryDial({
             {en(active.nameRu)}
           </div>
           <div className="text-[11px] tabular-nums" style={{ color: night ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
-            {SIGNS_EN[active.signIdx]} {Math.floor(active.degreeInSign)}° ·{" "}
+            {active.lon.toFixed(1)}° ·{" "}
             {active.isMoon
               ? `${Math.round((active.au * 149597870.7) / 1000)}k km`
               : `${active.au.toFixed(2)} AU`}{" "}
