@@ -1,7 +1,6 @@
 "use client";
 
 import type { Ratio } from "@/lib/periods";
-import { MIN_ORBITS, FIT_CENTRE_YEAR } from "@/lib/periods";
 
 /**
  * The period ratios, listed. The dial shows angles at one instant; these hold
@@ -19,16 +18,9 @@ export function RatioPanel({
   onLit: (names: string[]) => void;
   className?: string;
 }) {
-  const hasPluto = ratios.some((r) => r.a === "Pluto" || r.b === "Pluto");
   return (
     <section aria-label="Simple ratios between orbital periods" className={`flex flex-col gap-1.5 ${className}`}>
       <div className="label">simple ratios</div>
-      {/* The one line of framing on the page. It says what the object shows and
-          stops; the vocabulary everywhere else does the rest. */}
-      <p className="text-[12px] leading-snug max-w-[17rem]" style={{ color: "var(--muted-strong)" }}>
-        Fractions of a circle between the planets today, and whole-number ratios
-        between their years. A configuration nobody arranged.
-      </p>
       <table className="text-[12px] tabular-nums border-separate" style={{ borderSpacing: "0 2px" }}>
         <tbody>
           {ratios.map((r) => {
@@ -64,11 +56,6 @@ export function RatioPanel({
           })}
         </tbody>
       </table>
-      <p className="text-[10px] leading-snug max-w-[17rem]" style={{ color: "var(--muted)" }}>
-        Ratio of the two orbital periods, longer first. Periods are fitted from the
-        ephemeris over at least {MIN_ORBITS} revolutions of each body, centred on {FIT_CENTRE_YEAR}.
-        {hasPluto ? " Pluto is not drawn on the dial." : ""}
-      </p>
     </section>
   );
 }

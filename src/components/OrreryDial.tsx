@@ -7,13 +7,12 @@ import { useIsDark } from "@/lib/useIsDark";
 import { useSelectedDate } from "@/lib/selectedDate";
 import { blendHex, mixHex, planetTone, rimFor } from "@/lib/planetTones";
 
-
 const SIZE = 460;
 const C = SIZE / 2;
 // The disc is 230 across the radius and a body's glow reaches some eight px past
 // its ring, so Neptune at 212 fills the circle without touching the edge.
 const R_INNER = 54; // Mercury
-const R_OUTER = 198; // Neptune, pulled in to free a band for the scale
+const R_OUTER = 198; // Neptune, pulled in to leave the rim breathing room
 
 // Distances run 0.39 AU to 30 AU. Linear, Mercury through Mars collapse onto the
 // Sun; logarithmic, every orbit gets a readable gap. The dial trades true scale
@@ -190,26 +189,11 @@ function deviationLabel(rel: RelationDef, deviation: number): string {
   return `${rel.label} ${sign} ${Math.abs(deviation).toFixed(1)}°`;
 }
 
-/** The degree scale at the rim. A thin circle just outside the last orbit, a
-    tick every ten degrees, a number every thirty. It is the frame of the
-    drawing and the coordinate of everything in it, and means nothing on its
-    own. Ticks grow outward so they never touch Neptune's glow; the number
-    stands where a major tick would, so a horizontal label at 0° or 180° never
-    runs into a horizontal tick. */
-const R_SCALE = 207;
-const TICK_LEN = 3.2;
-const R_SCALE_LABEL = 214.5;
-
 /** One ink for every relation. Colour used to say which kind of angle it was,
     which is a verdict; the number says it now. Neutral so it never competes
     with the planet tints, and a step darker than the rim on paper because a
     thin line on white needs more weight than the same line on black. */
 const RELATION_INK = { day: "#3f4650", night: "#d5dbe6" };
-
-/** Muted on purpose: the scale may not compete with the planet tints. Day is
-    the darkest slate that still reads as recessive; anything lighter drops the
-    8.5px numerals under 4.5:1 against the paper. */
-const SCALE_INK = { day: "#5f6b78", night: "#8b95a3" };
 
 const MOON_OFFSET = 8.2;
 
@@ -620,7 +604,6 @@ export function OrreryDial({
   const shown = hover ?? pinned;
   const cardKey = touchMode ? shown : hover;
 
-
   const active = planets.find((p) => p.nameRu === cardKey) ?? null;
   const activeRelation = cardKey?.startsWith("rel:")
     ? relations[Number(cardKey.slice(4))] ?? null
@@ -942,59 +925,6 @@ export function OrreryDial({
           />
           ))}
 
-        {/* The degree scale: zero at three o'clock, counting counterclockwise,
-            the way the bodies run. Nothing here is a control. */}
-        <g pointerEvents="none" aria-hidden>
-          <circle
-            cx={C}
-            cy={C}
-            r={R_SCALE}
-            fill="none"
-            stroke={night ? SCALE_INK.night : SCALE_INK.day}
-            strokeWidth={0.6}
-            opacity={night ? 0.4 : 0.5}
-          />
-          {Array.from({ length: 36 }, (_, i) => {
-            const deg = i * 10;
-            if (deg % 30 === 0) return null;
-            const a = pointAt(deg, R_SCALE);
-            const b = pointAt(deg, R_SCALE + TICK_LEN);
-            return (
-              <line
-                key={`tick-${deg}`}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={night ? SCALE_INK.night : SCALE_INK.day}
-                strokeWidth={0.7}
-                opacity={night ? 0.55 : 0.6}
-              />
-            );
-          })}
-          {Array.from({ length: 12 }, (_, i) => {
-            const deg = i * 30;
-            const at = pointAt(deg, R_SCALE_LABEL);
-            return (
-              <text
-                key={`deg-${deg}`}
-                x={at.x}
-                y={at.y}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill={night ? SCALE_INK.night : SCALE_INK.day}
-                style={{
-                  fontSize: 8.5,
-                  fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  letterSpacing: "0.02em",
-                }}
-              >
-                {deg}°
-              </text>
-            );
-          })}
-        </g>
-
         {(() => {
             const earth = planets.find((p) => p.isEarth);
             if (!earth) return null;
@@ -1008,8 +938,8 @@ export function OrreryDial({
                   .map((p) => {
                     const pt = dialPoint(p, earth, night);
                     // Below the body for most. On the two outer orbits a name
-                    // below runs into the degree scale, so it sits beside the
-                    // body instead, on the side that faces the centre.
+                    // below runs out of the box, so it sits beside the body
+                    // instead, on the side that faces the centre.
                     const outer = radiusFor(p.au, night) > R_OUTER - 30;
                     const side = outer ? (pt.x >= C ? -1 : 1) : 0;
                     return (
