@@ -232,3 +232,14 @@ body {
   border-radius: 3px;
   color: var(--muted);
 }
+
+/* A row of the ratio table is a pointer onto the dial: hovering it lifts two
+   orbits. The row itself changes as little as possible, so the eye goes to
+   the dial and not back to the table. */
+.ratio-row {
+  cursor: default;
+  transition: color 120ms;
+}
+.ratio-row:hover td:first-child {
+  color: var(--accent) !important;
+}

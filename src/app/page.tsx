@@ -2,14 +2,20 @@ import { SelectedDateProvider } from "@/lib/selectedDate";
 import { StarField } from "@/components/StarField";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { YearAtAGlance } from "@/components/YearAtAGlance";
+import { simpleRatios } from "@/lib/periods";
 
 export const dynamic = "force-dynamic";
 
 /**
- * One screen and nothing under it. A universal chart of the real sky: no birth
- * data, no person, nothing true for one reader and not another.
+ * One screen and nothing under it. The real sky, the same for everybody: no
+ * input, nothing true for one reader and not another.
+ *
+ * The period ratios are fitted here, on the server, once per process. They
+ * never change, and the fit is a few thousand ephemeris calls the browser has
+ * no reason to repeat.
  */
 export default function Home() {
+  const ratios = simpleRatios();
   return (
     <SelectedDateProvider>
       <StarField />
@@ -18,7 +24,7 @@ export default function Home() {
         <div className="absolute top-4 right-4 z-10">
           <ThemeToggle />
         </div>
-        <YearAtAGlance />
+        <YearAtAGlance ratios={ratios} />
       </main>
     </SelectedDateProvider>
   );

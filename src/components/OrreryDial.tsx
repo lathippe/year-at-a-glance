@@ -206,8 +206,10 @@ const R_SCALE_LABEL = 214.5;
     thin line on white needs more weight than the same line on black. */
 const RELATION_INK = { day: "#3f4650", night: "#d5dbe6" };
 
-/** Muted on purpose: the scale may not compete with the planet tints. */
-const SCALE_INK = { day: "#6f7b88", night: "#8b95a3" };
+/** Muted on purpose: the scale may not compete with the planet tints. Day is
+    the darkest slate that still reads as recessive; anything lighter drops the
+    8.5px numerals under 4.5:1 against the paper. */
+const SCALE_INK = { day: "#5f6b78", night: "#8b95a3" };
 
 const MOON_OFFSET = 8.2;
 
@@ -1005,11 +1007,11 @@ export function OrreryDial({
                   .filter((p) => !p.isEarth)
                   .map((p) => {
                     const pt = dialPoint(p, earth, night);
-                    // Below the body for most; for the two outer orbits the name
-                    // steps inward instead, or it runs into the degree scale.
+                    // Below the body for most. On the two outer orbits a name
+                    // below runs into the degree scale, so it sits beside the
+                    // body instead, on the side that faces the centre.
                     const outer = radiusFor(p.au, night) > R_OUTER - 30;
-                    const ux = outer ? (C - pt.x) / Math.hypot(C - pt.x, C - pt.y) : 0;
-                    const uy = outer ? (C - pt.y) / Math.hypot(C - pt.x, C - pt.y) : 1;
+                    const side = outer ? (pt.x >= C ? -1 : 1) : 0;
                     return (
                       <g key={`name-${p.nameRu}`}>
                         {/* Only the bodies actually in a relation are named, and
@@ -1017,11 +1019,13 @@ export function OrreryDial({
                             the sky. */}
                         {named.has(p.nameRu) && !p.isMoon && (
                           <text
-                            x={pt.x + ux * 14}
-                            y={pt.y + uy * 13 + (outer ? 4 : 0)}
-                            textAnchor="middle"
+                            x={pt.x + side * 9}
+                            y={outer ? pt.y + 3.5 : pt.y + 13}
+                            textAnchor={side === 0 ? "middle" : side < 0 ? "end" : "start"}
                             fill="var(--muted)"
-                            opacity={0.75}
+                            // Full ink on paper: at three quarters the grey fell
+                            // to 3.3:1, under the line for ten-pixel text.
+                            opacity={night ? 0.8 : 1}
                             style={{ fontSize: 10 }}
                           >
                             {en(p.nameRu)}

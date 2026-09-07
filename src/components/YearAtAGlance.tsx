@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { OrreryDial } from "./OrreryDial";
+import { RatioPanel } from "./RatioPanel";
 import { helioPositions } from "@/lib/helio";
+import type { Ratio } from "@/lib/periods";
 import { useSelectedDate } from "@/lib/selectedDate";
 
 const DAY = 86400000;
@@ -34,8 +36,10 @@ function addDays(d: Date, n: number): Date {
  * One date drives all of it, and it lives in the shared context — which is what
  * makes the wheel move the ruler and the readout for free.
  */
-export function YearAtAGlance() {
+export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
   const { selected, setSelected, today: todayDate } = useSelectedDate();
+  // Bodies the ratio panel is pointing at; the dial lifts them.
+  const [lit, setLit] = useState<string[]>([]);
   const todayMs = todayDate.getTime();
   const [dragging, setDragging] = useState(false);
   const root = useRef<HTMLDivElement | null>(null);
@@ -311,7 +315,7 @@ export function YearAtAGlance() {
     <div className="flex flex-col items-center">
       <div
         ref={root}
-        className="h-[100dvh] w-full flex flex-col items-center px-4 pt-5 pb-4 overscroll-none"
+        className="relative h-[100dvh] w-full flex flex-col items-center px-4 pt-5 pb-4 overscroll-none"
       >
         <header className="flex flex-col items-center gap-1 shrink-0">
           {/* The only text on the page. It is the readout for the wheel, and
@@ -363,9 +367,19 @@ export function YearAtAGlance() {
               planets={planets}
               maxWidth={1400}
               wheelScrub={false}
+              lit={lit}
             />
           </div>
         </div>
+
+        {/* The ratios that hold across the whole window. On a wide screen they
+            sit in the corner the dial leaves empty; on a narrow one they take
+            their place in the column, between the dial and the ruler. */}
+        <RatioPanel
+          ratios={ratios}
+          onLit={setLit}
+          className="w-full max-w-[54rem] shrink-0 mb-3 lg:w-auto lg:max-w-none lg:mb-0 lg:absolute lg:left-5 lg:top-5"
+        />
 
         {/* Just a ruler. The bars that used to live here said the same thing
             the dial says, one scroll away, and took a third of the cover to say
