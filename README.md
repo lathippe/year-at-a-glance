@@ -2,11 +2,9 @@
 
 ![The dial at night: nine planets on their orbits, the simple angles between them drawn in](docs/preview.png)
 
-The planets where they really are, January 2026 to the spring of 2027, on one
-dial. Between them, the simple fractions of a circle: halves, thirds, quarters,
-sixths, each labelled with how far off it stands. Beside the dial, the
-whole-number ratios between their orbital periods, which hold on every date.
-Nobody arranged any of it.
+An art piece about proportion. The solar system as a dial: where the planets
+stand on a given day, the simple angles between them, and how their years
+divide into one another.
 
 **Live:** https://year-at-a-glance-beta.vercel.app
 
@@ -18,10 +16,9 @@ Nobody arranged any of it.
   is exact, no radius is. A degree scale at the rim gives every position its
   coordinate, zero at three o'clock, counting counterclockwise.
 - **Relations as lines.** Two planets standing at a simple fraction of a circle
-  from each other, seen from Earth, are joined by one thin arc bowed outward.
-  How near they stand to the exact fraction is the line's weight and opacity,
-  continuously; the card reads `1/4 − 2.3°`, then the measured and exact angles.
-  Click the Sun to show every relation, a planet for its own.
+  from each other are joined by one thin arc bowed outward. The nearer they
+  stand to the exact fraction, the heavier the line. Click the Sun to show every
+  relation, a planet for its own; a card gives the numbers.
 - **Simple ratios.** The pairs whose orbital periods stand near a ratio of small
   whole numbers, with the computed ratio next to the ideal: Earth : Venus 13:8,
   Pluto : Neptune 3:2, Saturn : Jupiter 5:2, Neptune : Uranus 2:1. Periods are
