@@ -29,10 +29,30 @@ const literata = Literata({
   axes: ["opsz"],
 });
 
+const SITE = "https://year-at-a-glance-beta.vercel.app";
+const TITLE = "Year at a Glance: simple ratios between the planets";
+const DESCRIPTION =
+  "An art piece about proportion. The solar system as a dial: where the planets stand, the simple fractions of a circle between them, and how their years divide into one another.";
+
 export const metadata: Metadata = {
-  title: "Year at a Glance: simple ratios between the planets",
-  description:
-    "The planets where they really are, January 2026 to spring 2027, on one dial. Halves, thirds and quarters of a circle between them, and whole-number ratios between their orbital periods, in a configuration nobody arranged.",
+  metadataBase: new URL(SITE),
+  title: TITLE,
+  description: DESCRIPTION,
+  // The picture a shared link carries. A screenshot of the dial with the
+  // relations on, night sky, 1200×630.
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: SITE,
+    type: "website",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "The dial: nine planets on their orbits with the simple angles between them drawn in" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: ["/og.png"],
+  },
 };
 
 export default function RootLayout({

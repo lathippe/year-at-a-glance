@@ -1,5 +1,7 @@
 # Year at a Glance
 
+![The dial at night: nine planets on their orbits, the simple angles between them drawn in](docs/preview.png)
+
 The planets where they really are, January 2026 to the spring of 2027, on one
 dial. Between them, the simple fractions of a circle: halves, thirds, quarters,
 sixths, each labelled with how far off it stands. Beside the dial, the
