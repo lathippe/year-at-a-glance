@@ -7,6 +7,12 @@ import { RatioPanel } from "./RatioPanel";
 import { helioPositions } from "@/lib/helio";
 import type { Ratio } from "@/lib/periods";
 import { useSelectedDate } from "@/lib/selectedDate";
+import { useIsDark } from "@/lib/useIsDark";
+import dynamic from "next/dynamic";
+
+/** The tilted view pulls in three.js, which the flat dial does not need. It loads
+    only when someone asks to tilt. */
+const OrreryTilt = dynamic(() => import("./OrreryTilt"), { ssr: false });
 
 const DAY = 86400000;
 const MONTH = 30.44 * DAY;
@@ -45,6 +51,10 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
   // Where every angle has its vertex. From the Sun by default, because that is
   // what the dial draws; from Earth is what an observer here would measure.
   const [frame, setFrame] = useState<Frame>("sun");
+  // Flat is the dial. Tilt is the same sky in three dimensions: the real orbits,
+  // each in its own plane. The relations live on the flat dial only.
+  const [tilt, setTilt] = useState(false);
+  const night = useIsDark();
   const todayMs = todayDate.getTime();
   const [dragging, setDragging] = useState(false);
   const root = useRef<HTMLDivElement | null>(null);
@@ -363,6 +373,17 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
         >
           <span className="label">{frame === "sun" ? "from the Sun" : "from Earth"}</span>
         </button>
+        {/* Same clothes again, one step down. */}
+        <button
+          type="button"
+          onClick={() => setTilt((v) => !v)}
+          aria-pressed={tilt}
+          title="Lean the dial over to see the orbits in three dimensions"
+          aria-label="Switch between the flat dial and the tilted view"
+          className="absolute right-4 top-24 z-10 flex items-center gap-2 rounded-full border border-[color:var(--border)] hover:border-[color:var(--border-strong)] transition-colors text-[color:var(--muted-strong)] px-3 h-8 cursor-pointer"
+        >
+          <span className="label">{tilt ? "flat" : "tilt"}</span>
+        </button>
         <header className="flex flex-col items-center gap-1 shrink-0">
           {/* The only text on the page. It is the readout for the wheel, and
               knowing where you have scrolled to is the whole interaction. The
@@ -412,13 +433,17 @@ export function YearAtAGlance({ ratios }: { ratios: Ratio[] }) {
           onPointerCancel={touchUp}
         >
           <div style={{ width: "min(100%, 100cqh)", aspectRatio: "1 / 1" }}>
-            <OrreryDial
-              planets={planets}
-              maxWidth={1400}
-              wheelScrub={false}
-              lit={lit}
-              frame={frame}
-            />
+            {tilt ? (
+              <OrreryTilt date={drawn} night={night} />
+            ) : (
+              <OrreryDial
+                planets={planets}
+                maxWidth={1400}
+                wheelScrub={false}
+                lit={lit}
+                frame={frame}
+              />
+            )}
           </div>
         </div>
 
